@@ -34,6 +34,41 @@ Ralph Wiggum 是《辛普森一家》中的角色——一个看起来不太聪�
 | 上下文管理 | 会话重启丢失进度 | 文件/git持久化记忆 |
 | 人工干预 | 需要频繁介入 | 真正的无人值守 |
 
+## 防止过早退出
+
+### 为什么会过早退出？
+
+Ralph Loop 的核心目标是"持续迭代直到真正完成"，但实际上经常会过早退出。原因如下：
+
+| 问题 | 症状 | 根因 |
+|------|------|------|
+| **主观判断完成** | 标记 `complete: true` 但验证失败 | AI 自我感觉良好 |
+| **跳过验证** | 不运行验证命令就退出 | 验证被视为可选 |
+| **忽略 errors** | 只看 "build 成功" 忽略 lint errors | 验证不全面 |
+| **状态不同步** | PROGRESS.md 显示完成但实际未完成 | 状态是主观标记 |
+
+### 强制规则
+
+```
+🔴 绝对规则 1：每次迭代结束时必须运行所有 required 验证命令
+🔴 绝对规则 2：只有验证结果为 errors == 0 才算通过
+🔴 绝对规则 3：所有任务 complete=true 且所有 required 验证通过才能输出 <promise>
+🔴 绝对规则 4：验证结果必须写入 PROGRESS.md，不能只靠主观标记
+```
+
+### 验证结果判断
+
+| 验证命令 | 通过条件 | 失败条件 |
+|---------|---------|---------|
+| lint | errors == 0 | errors > 0 |
+| test | 0 failed | N failed |
+| build | exit_code == 0 | exit_code != 0 |
+| coverage | value >= threshold | value < threshold |
+
+**注意**：warnings 是可接受的，但应该尽量减少。
+
+---
+
 ## 关键三要素
 
 1. **明确任务 + 完成条件**：可验证的成功标准
@@ -186,6 +221,13 @@ Ralph Wiggum 是《辛普森一家》中的角色——一个看起来不太聪�
   "max_iterations": 50,
   "verification_commands": [
     {
+      "name": "代码检查",
+      "command": "npm run lint",
+      "required": true,
+      "error_pattern": "(\\d+) error",
+      "warning_pattern": "(\\d+) warning"
+    },
+    {
       "name": "单元测试",
       "command": "npm run test:unit",
       "required": true
@@ -198,11 +240,19 @@ Ralph Wiggum 是《辛普森一家》中的角色——一个看起来不太聪�
     }
   ],
   "stop_conditions": [
-    "所有 required 验证命令通过",
-    "coverage >= 80%"
+    "所有 required 验证命令通过（errors == 0）",
+    "所有任务标记为 complete",
+    "coverage >= 80%（如果配置了 threshold）"
   ]
 }
 ```
+
+**关键说明**：
+
+- 只有 `errors == 0` 才算验证通过
+- `warnings` 是可接受的（但不应该太多）
+- 每次迭代结束必须运行所有 required 验证命令
+- 验证结果必须写入 PROGRESS.md
 
 ## 完成承诺
 
@@ -286,6 +336,22 @@ ralph-planner 会引导你：
 ### Q: Ralph Loop 适合所有任务吗？
 
 A: 不适合。只有有明确、可程序化验证完成标准的任务才适合。
+
+### Q: 为什么 Ralph Loop 会过早退出？
+
+A: 常见原因：
+
+| 问题 | 症状 | 解决方案 |
+|------|------|---------|
+| 主观判断完成 | 标记 complete 但验证失败 | 必须基于验证结果判断 |
+| 跳过验证 | 不运行验证就退出 | 强制每次迭代都验证 |
+| 忽略 errors | 只看 build 忽略 lint | 区分 errors 和 warnings |
+| 状态不同步 | PROGRESS 不反映实际 | 验证结果写入文件 |
+
+**核心原则**：
+- `errors == 0` 才算通过（warnings 可接受）
+- 所有任务 complete=true 且所有 required 验证通过才能输出 `<promise>`
+- 验证结果必须持久化到 PROGRESS.md
 
 ### Q: 迭代次数用完了还没完成怎么办？
 

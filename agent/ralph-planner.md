@@ -214,6 +214,10 @@ iteration: 0
 status: initialized
 started_at: [ISO时间戳]
 last_updated: [ISO时间戳]
+last_verification:
+  all_required_passed: false
+  errors: null
+  warnings: null
 ---
 
 ## 当前迭代
@@ -222,11 +226,23 @@ last_updated: [ISO时间戳]
 **当前任务**：无
 **状态**：等待启动
 
+## 任务进度概览
+
+| # | 任务名称 | 状态 | 验证结果 |
+|---|---------|------|---------|
+| 1 | [任务1] | ⏭ 待开始 | - |
+| 2 | [任务2] | ⏭ 待开始 | - |
+
+## 验证历史
+
+（每次迭代结束后由 Executor 填充）
+
 ## 迭代历史
 
 ### 迭代 0 - 初始化
 - 时间：[ISO时间戳]
 - 操作：创建规划文件
+- 验证：未执行
 - 状态：完成
 
 ---
@@ -237,7 +253,16 @@ last_updated: [ISO时间戳]
 - 完成任务数：0 / N
 - 发现问题数：0
 - 解决问题数：0
+- 当前 errors：-
+- 当前 warnings：-
 ```
+
+**重要说明**：
+
+- `last_verification` 字段记录最近一次验证结果
+- `errors` 为 0 才算验证通过
+- `warnings` 可接受，但应尽量减少
+- 每次迭代后必须更新验证历史
 
 #### 3.5 LEARNING.md 模板
 
@@ -284,6 +309,13 @@ last_updated: [ISO时间戳]
   "max_iterations": 50,
   "verification_commands": [
     {
+      "name": "代码检查",
+      "command": "npm run lint",
+      "required": true,
+      "error_pattern": "(\\d+) error",
+      "warning_pattern": "(\\d+) warning"
+    },
+    {
       "name": "单元测试",
       "command": "npm run test:unit",
       "required": true
@@ -301,11 +333,23 @@ last_updated: [ISO时间戳]
     }
   ],
   "stop_conditions": [
-    "所有 required 验证命令通过",
-    "coverage >= 80%"
+    "所有 required 验证命令通过（errors == 0）",
+    "所有任务标记为 complete",
+    "coverage >= 80%（如果配置了 threshold）"
   ]
 }
 ```
+
+**字段说明**：
+
+| 字段 | 说明 |
+|------|------|
+| `name` | 验证命令的友好名称 |
+| `command` | 实际执行的命令 |
+| `required` | 是否必须通过才能完成循环 |
+| `error_pattern` | 正则表达式，用于从输出中提取 errors 数量 |
+| `warning_pattern` | 正则表达式，用于从输出中提取 warnings 数量 |
+| `threshold` | 可选，数值阈值（如覆盖率） |
 
 ### 阶段 4：定义完成承诺
 
@@ -317,6 +361,20 @@ last_updated: [ISO时间戳]
 - **可验证**：可以通过命令或检查确认
 - **可达成**：在合理迭代次数内可以达成
 - **全面**：覆盖所有关键验收标准
+- **区分 errors**：只有 errors == 0 才算通过
+
+#### 4.2 验证命令要求
+
+每个验证命令必须明确定义：
+
+| 要求 | 说明 |
+|------|------|
+| `required` | 是否必须通过才能完成循环 |
+| `error_pattern` | 正则表达式提取 errors 数量 |
+| `warning_pattern` | 正则表达式提取 warnings 数量 |
+| `threshold` | 可选，数值阈值 |
+
+**关键**：只有 `errors == 0` 才算验证通过，warnings 是可接受的。
 
 #### 4.2 好的 vs 坏的完成承诺
 

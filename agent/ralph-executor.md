@@ -25,6 +25,26 @@ Ralph Loop 的核心是：
 2. **外部验证**：完成由客观条件判定，而非自我评估
 3. **学习积累**：每轮迭代都积累经验，避免重复错误
 
+## ⚠️ 关键问题：为什么 Ralph Loop 会过早退出
+
+### 过往失败模式
+
+| 问题 | 症状 | 根因 |
+|------|------|------|
+| **主观判断完成** | 标记 `complete: true` 但验证失败 | AI 自我感觉良好 |
+| **跳过验证** | 不运行验证命令就退出 | 验证被视为可选 |
+| **忽略 errors** | 只看 "build 成功" 忽略 lint errors | 验证不全面 |
+| **状态不同步** | PROGRESS.md 显示完成但实际未完成 | 状态是主观标记 |
+
+### 强制规则
+
+```
+🔴 绝对规则 1：每次迭代结束时必须运行所有 required 验证命令
+🔴 绝对规则 2：只有验证结果为"无 errors"才算通过
+🔴 绝对规则 3：所有任务 complete=true 且所有 required 验证通过才能输出 <promise>
+🔴 绝对规则 4：验证结果必须写入 PROGRESS.md，不能只靠主观标记
+```
+
 ## 执行原则
 
 ### 🔴 绝对不中断
@@ -90,7 +110,7 @@ Please run ralph-planner first to create the planning files.
 
 从 `tasks.json` 提取：
 - 任务列表
-- 当前未完成的任务
+- 当前未完成的任务（`complete: false`）
 
 #### 0.3 输出启动信息
 
@@ -104,16 +124,20 @@ RALPH LOOP EXECUTOR - 开始执行
 最大迭代次数：[M]
 完成承诺：[承诺文本]
 
+验证命令：
+  [x] [命令1] (required)
+  [ ] [命令2] (optional)
+
 开始时间：[ISO时间戳]
 ================================================================================
 
 迭代 1 开始...
 ```
 
-### 阶段 1：迭代循环
+### 阶段 1：迭代循环（核心）
 
 ```python
-iteration = 1
+iteration = current_iteration + 1
 while iteration <= max_iterations:
     
     # 1. 读取当前状态
@@ -121,34 +145,37 @@ while iteration <= max_iterations:
     learning = read_learning()
     tasks = read_tasks()
     
-    # 2. 检查是否有未完成任务
-    if all_tasks_complete(tasks):
+    # 2. 选择下一个未完成任务
+    current_task = select_next_incomplete_task(tasks)
+    if current_task is None:
+        # 所有任务已标记完成，进入最终验证
         break
     
-    # 3. 选择下一个任务
-    current_task = select_next_task(tasks)
+    # 3. 执行任务
+    execution_result = execute_task(current_task, learning)
     
-    # 4. 执行任务
-    execute_task(current_task, learning)
+    # 4. 任务级验证（如果有针对该任务的验证）
+    task_verification = verify_task(current_task)
     
-    # 5. 验证任务
-    result = verify_task(current_task)
+    # 5. 更新任务状态（基于验证结果，不是主观判断）
+    if task_verification.passed:
+        mark_task_complete(current_task)
+        update_tasks_json(current_task.id, complete=True)
     
-    # 6. 更新进度
-    update_progress(progress, iteration, current_task, result)
+    # 6. 🔴 强制：运行所有验证命令
+    verification_results = run_all_verification_commands()
     
-    # 7. 记录学习（如果有新发现）
-    if has_new_learning(result):
-        update_learning(learning, iteration, result)
+    # 7. 🔴 强制：记录验证结果到 PROGRESS.md
+    update_progress_with_verification(progress, iteration, current_task, verification_results)
     
-    # 8. 检查完成承诺
-    if check_completion_promise():
+    # 8. 记录学习（如果有新发现）
+    if has_new_learning(execution_result):
+        update_learning(learning, iteration, execution_result)
+    
+    # 9. 🔴 强制：检查完成承诺（基于验证结果）
+    if check_completion_promise(verification_results, tasks):
         output_promise()
         break
-    
-    # 9. 更新任务状态
-    if result.success:
-        mark_task_complete(current_task)
     
     iteration += 1
 ```
@@ -208,62 +235,214 @@ def handle_error(error, task):
     retry_task(task)
 ```
 
-### 阶段 3：验证
+### 阶段 3：验证（🔴 强制执行）
 
-#### 3.1 运行验证命令
+#### 3.1 验证命令执行
 
-根据 `ralph-config.json` 中的 `verification_commands` 依次执行：
+**每次迭代结束时必须执行所有 required 验证命令**，不可跳过。
 
 ```bash
-# 示例
-npm run test:unit
-npm run test:integration
-npm run test:coverage
+# 按顺序执行 ralph-config.json 中的 verification_commands
+for cmd in verification_commands:
+    result = run_command(cmd.command)
+    store_result(cmd.name, result)
 ```
 
-#### 3.2 验证结果分析
+#### 3.2 验证结果解析
+
+**关键：区分 errors 和 warnings**
+
+```python
+def parse_verification_result(command_name, output, exit_code):
+    result = {
+        "command": command_name,
+        "exit_code": exit_code,
+        "passed": exit_code == 0,
+        "errors": 0,
+        "warnings": 0,
+        "details": []
+    }
+    
+    # 对于 lint 命令，解析 errors 和 warnings
+    if "lint" in command_name.lower():
+        # ESLint 输出格式示例：
+        # "✖ 9 problems (1 error, 8 warnings)"
+        error_match = re.search(r'(\d+) error', output)
+        warning_match = re.search(r'(\d+) warning', output)
+        
+        if error_match:
+            result["errors"] = int(error_match.group(1))
+        if warning_match:
+            result["warnings"] = int(warning_match.group(1))
+        
+        # 🔴 只有 errors > 0 才算失败
+        result["passed"] = result["errors"] == 0
+    
+    # 对于测试命令
+    elif "test" in command_name.lower():
+        # Vitest/Jest 输出格式
+        # "Test Files  1 passed (1)"
+        # "Tests  1 passed (1)"
+        failed_match = re.search(r'(\d+) failed', output)
+        if failed_match:
+            result["errors"] = int(failed_match.group(1))
+            result["passed"] = result["errors"] == 0
+    
+    # 对于构建命令
+    elif "build" in command_name.lower():
+        result["passed"] = exit_code == 0
+        if not result["passed"]:
+            result["errors"] = 1
+    
+    return result
+```
+
+#### 3.3 验证结果结构
+
+```json
+{
+  "iteration": 5,
+  "timestamp": "2026-03-12T10:30:00Z",
+  "results": [
+    {
+      "command": "npm run lint",
+      "required": true,
+      "exit_code": 0,
+      "passed": true,
+      "errors": 0,
+      "warnings": 8,
+      "details": "8 warnings, 0 errors"
+    },
+    {
+      "command": "npm run test",
+      "required": true,
+      "exit_code": 0,
+      "passed": true,
+      "errors": 0,
+      "warnings": 0,
+      "details": "42 tests passed"
+    },
+    {
+      "command": "npm run build",
+      "required": true,
+      "exit_code": 0,
+      "passed": true,
+      "errors": 0,
+      "warnings": 0,
+      "details": "Build successful"
+    }
+  ],
+  "all_required_passed": true,
+  "summary": "✅ All required verification commands passed (0 errors)"
+}
+```
+
+#### 3.4 验证输出示例
 
 ```
-验证结果：
-- 单元测试：✅ 通过 (42 tests)
-- 集成测试：❌ 失败 (2 failures)
-- 覆盖率：78% (目标：80%)
+================================================================================
+验证结果 - 迭代 5
+================================================================================
 
-失败用例：
-- test_user_login_invalid_email
-- test_password_reset_expired_token
+| 命令 | 必需 | 状态 | Errors | Warnings |
+|------|------|------|--------|----------|
+| npm run lint | ✅ | ✅ 通过 | 0 | 8 |
+| npm run test | ✅ | ✅ 通过 | 0 | 0 |
+| npm run build | ✅ | ✅ 通过 | 0 | 0 |
 
-开始修复...
+总结果：✅ 所有 required 验证通过 (0 errors)
+
+================================================================================
 ```
 
-### 阶段 4：进度记录
+### 阶段 4：进度记录（🔴 强制写入验证结果）
 
-#### 4.1 更新 PROGRESS.md
+#### 4.1 PROGRESS.md 格式
 
-每次迭代后更新：
+每次迭代后，**必须**更新 PROGRESS.md 并包含验证结果：
 
 ```markdown
+# Ralph Loop 进度记录
+
+---
+iteration: 5
+status: in_progress
+started_at: 2026-03-12T10:00:00.000Z
+last_updated: 2026-03-12T10:30:00.000Z
+last_verification:
+  all_required_passed: true
+  errors: 0
+  warnings: 8
+---
+
+## 当前迭代
+
+**迭代编号**：5
+**当前任务**：任务 6 - 单词测试模块
+**状态**：进行中
+
+## 任务进度概览
+
+| # | 任务名称 | 状态 | 验证结果 |
+|---|---------|------|---------|
+| 1 | 项目初始化与基础架构 | ✅ 完成 | 通过 |
+| 2 | 数据库设计与初始化 | ✅ 完成 | 通过 |
+| 3 | 用户认证系统 | ✅ 完成 | 通过 |
+| 4 | 布局与导航组件 | ✅ 完成 | 通过 |
+| 5 | 单词学习模块 | ✅ 完成 | 通过 |
+| 6 | 单词测试模块 | ⏳ 进行中 | - |
+| 7 | 生词本模块 | ⏭ 待开始 | - |
+
+## 验证历史
+
+### 迭代 5 验证结果 (2026-03-12T10:30:00Z)
+
+| 命令 | 必需 | 状态 | Errors | Warnings |
+|------|------|------|--------|----------|
+| npm run lint | ✅ | ✅ 通过 | 0 | 8 |
+| npm run test | ✅ | ✅ 通过 | 0 | 0 |
+| npm run build | ✅ | ✅ 通过 | 0 | 0 |
+
+**总结果**：✅ 所有 required 验证通过
+
+### 迭代 4 验证结果 (2026-03-12T10:20:00Z)
+
+| 命令 | 必需 | 状态 | Errors | Warnings |
+|------|------|------|--------|----------|
+| npm run lint | ✅ | ❌ 失败 | 1 | 8 |
+| npm run test | ✅ | ✅ 通过 | 0 | 0 |
+| npm run build | ✅ | ✅ 通过 | 0 | 0 |
+
+**总结果**：❌ 有 1 个 error，需要修复
+
+**失败原因**：WordLearningClient.tsx React Compiler error
+
+---
+
 ## 迭代历史
 
-### 迭代 N - [日期时间]
+### 迭代 5 - 修复 React Compiler 错误
+- 时间：2026-03-12T10:30:00Z
+- 操作：移除手动 useCallback，让 React Compiler 自动优化
+- 验证：✅ 通过 (0 errors)
+- 状态：完成
 
-**执行任务**：[任务名称]
+### 迭代 4 - 单词学习模块完成
+- 时间：2026-03-12T10:20:00Z
+- 操作：完成单词学习模块开发
+- 验证：❌ 失败 (1 error)
+- 状态：需要修复
 
-**操作**：
-- [操作1]
-- [操作2]
+---
 
-**验证结果**：
-- [结果1]
-- [结果2]
+## 统计
 
-**状态**：[完成/进行中/阻塞]
-
-**发现的问题**：
-- [问题1]：[解决方案]
-- [问题2]：[解决方案]
-
-**下一步**：[下一步行动]
+- 总迭代次数：5
+- 完成任务数：5 / 14
+- 发现问题数：1
+- 解决问题数：1
+- 当前 errors：0
+- 当前 warnings：8
 ```
 
 #### 4.2 更新 tasks.json
@@ -273,7 +452,7 @@ npm run test:coverage
 ```json
 {
   "task": "任务名称",
-  "complete": true  // 改为 true
+  "complete": true
 }
 ```
 
@@ -315,26 +494,31 @@ npm run test:coverage
 **记住**：[一句话总结]
 ```
 
-### 阶段 6：完成检查
+### 阶段 6：完成检查（🔴 严格条件）
 
 #### 6.1 检查完成承诺
 
 ```python
-def check_completion_promise():
-    # 运行所有 required 验证命令
-    for cmd in verification_commands:
-        if cmd.required:
-            result = run_command(cmd.command)
-            if not result.success:
-                return False
-        
-        # 检查阈值（如果有）
-        if cmd.threshold:
-            if result.value < cmd.threshold:
-                return False
+def check_completion_promise(verification_results, tasks):
+    """
+    检查完成承诺是否满足。
     
-    # 所有检查通过
-    return True
+    必须同时满足：
+    1. 所有 required 验证命令通过（errors == 0）
+    2. 所有任务标记为 complete
+    """
+    
+    # 检查 1：所有 required 验证命令通过
+    for result in verification_results:
+        if result.required and result.errors > 0:
+            return False, f"验证命令 {result.command} 有 {result.errors} 个 errors"
+    
+    # 检查 2：所有任务完成
+    incomplete_tasks = [t for t in tasks if not t.complete]
+    if incomplete_tasks:
+        return False, f"还有 {len(incomplete_tasks)} 个任务未完成"
+    
+    return True, "所有条件满足"
 ```
 
 #### 6.2 输出完成承诺
@@ -347,15 +531,25 @@ RALPH LOOP - 完成承诺达成
 ================================================================================
 
 所有验证条件已满足：
-✅ [条件1]
-✅ [条件2]
-✅ [条件3]
+✅ npm run lint: 0 errors, 8 warnings
+✅ npm run test: 42 tests passed
+✅ npm run build: 成功
+
+所有任务已完成：
+✅ 任务 1: 项目初始化与基础架构
+✅ 任务 2: 数据库设计与初始化
+✅ 任务 3: 用户认证系统
+✅ 任务 4: 布局与导航组件
+✅ 任务 5: 单词学习模块
+✅ 任务 6: 单词测试模块
+✅ 任务 7: 生词本模块
+... (所有任务)
 
 <promise>[承诺文本]</promise>
 
 总迭代次数：[N]
 总耗时：[时间]
-完成任务数：[M] / [Total]
+完成任务数：[Total] / [Total]
 
 ================================================================================
 ```
@@ -372,18 +566,37 @@ RALPH LOOP - 达到最大迭代次数
 迭代次数：[max_iterations] / [max_iterations]
 
 ## 完成状态
-- 完成任务：[M] / [Total]
-- 未完成任务：[列表]
+
+### 任务完成情况
+- 完成：[M] / [Total]
+- 未完成：[列表]
+
+### 最后验证结果
+| 命令 | 必需 | 状态 | Errors | Warnings |
+|------|------|------|--------|----------|
+| npm run lint | ✅ | ❌ 失败 | 1 | 8 |
+| npm run test | ✅ | ✅ 通过 | 0 | 0 |
+| npm run build | ✅ | ✅ 通过 | 0 | 0 |
 
 ## 未满足的完成条件
-- [条件1]：[当前状态]
-- [条件2]：[当前状态]
+
+1. **验证失败**：npm run lint 有 1 个 error
+   - 错误位置：src/components/words/WordLearningClient.tsx:37
+   - 错误类型：React Compiler error
+
+2. **任务未完成**：
+   - 任务 6: 单词测试模块
+   - 任务 12: 性能优化
+   - 任务 13: 无障碍优化
 
 ## 建议
-1. [建议1]
-2. [建议2]
+
+1. 修复 lint error 后继续
+2. 增加迭代次数限制
+3. 简化任务范围
 
 ## 可以尝试
+
 - 增加 max_iterations
 - 调整任务分解
 - 简化完成承诺
@@ -415,10 +628,11 @@ RALPH LOOP - 达到最大迭代次数
 
 1. **🔴 不中断**：绝不因为任何原因暂停等待用户确认
 2. **🔴 不问问题**：遇到问题自己决策，记录决策理由
-3. **🟢 持续迭代**：完成一个任务立即开始下一个
-4. **🟢 记录进度**：每次迭代都更新 PROGRESS.md
-5. **🟡 学习积累**：发现模式或陷阱时更新 LEARNING.md
-6. **🟡 客观验证**：完成承诺必须通过验证命令确认
+3. **🔴 强制验证**：每次迭代结束必须运行所有 required 验证命令
+4. **🔴 记录结果**：验证结果必须写入 PROGRESS.md
+5. **🔴 区分 errors**：只有 errors > 0 才算验证失败
+6. **🟢 持续迭代**：完成一个任务立即开始下一个
+7. **🟢 客观验证**：完成承诺必须通过验证命令确认，不是主观判断
 
 ## 执行示例
 
@@ -427,53 +641,66 @@ RALPH LOOP - 达到最大迭代次数
 RALPH LOOP EXECUTOR - 开始执行
 ================================================================================
 
-项目：用户认证模块重构
-任务数：5 个（待完成：5 个）
-最大迭代次数：30
-完成承诺：所有测试通过，覆盖率 >= 80%
+项目：EnglishHub 英语学习平台
+任务数：14 个（待完成：14 个）
+最大迭代次数：80
+完成承诺：所有功能模块开发完成，npm run build 成功，测试覆盖率 >= 70%
 
-开始时间：2026-03-12T10:00:00Z
+验证命令：
+  [x] npm run lint (required)
+  [x] npm run test (required)
+  [x] npm run build (required)
+  [ ] npm run test:e2e (optional)
+
+开始时间：2026-03-12T02:00:00Z
 ================================================================================
 
 迭代 1 开始...
 
 ## 读取当前状态
-- PROGRESS.md: 初始化状态
+- PROGRESS.md: 初始化状态，iteration=0
 - LEARNING.md: 无历史记录
-- tasks.json: 5 个任务待完成
+- tasks.json: 14 个任务待完成
 
 ## 选择任务
-任务 1：重构密码验证逻辑
+任务 1：项目初始化与基础架构
 
 ## 执行任务
-步骤 1：读取现有密码验证代码...
-步骤 2：设计新的验证架构...
-步骤 3：实现验证逻辑...
-步骤 4：编写单元测试...
+步骤 1：创建 Next.js 项目...
+步骤 2：配置 ESLint、Prettier...
+步骤 3：安装测试框架...
+...
 
-## 验证
-运行测试... ✅ 12/12 通过
-覆盖率检查... 当前：65%
+## 任务验证
+运行 npm run lint... ✅ 0 errors
+运行 npm run test... ✅ 1 test passed
+运行 npm run build... ✅ 成功
+
+## 🔴 运行所有验证命令
+
+| 命令 | 必需 | 状态 | Errors | Warnings |
+|------|------|------|--------|----------|
+| npm run lint | ✅ | ✅ 通过 | 0 | 0 |
+| npm run test | ✅ | ✅ 通过 | 0 | 0 |
+| npm run build | ✅ | ✅ 通过 | 0 | 0 |
+
+总结果：✅ 所有 required 验证通过 (0 errors)
 
 ## 更新进度
-PROGRESS.md 已更新
-tasks.json 任务 1 标记完成
+- tasks.json: 任务 1 标记 complete=true
+- PROGRESS.md: 记录迭代 1 结果
 
 ## 检查完成承诺
-❌ 未满足（覆盖率 65% < 80%）
+❌ 未满足（还有 13 个任务未完成）
 
 迭代 1 完成
 --------------------------------------------------------------------------------
 
 迭代 2 开始...
 
-## 读取学习笔记
-[无新学习]
-
 ## 选择任务
-任务 2：添加边缘情况测试
+任务 2：数据库设计与初始化
 
-## 执行任务
 ...
 
 [继续迭代直到完成承诺满足或达到最大迭代次数]
