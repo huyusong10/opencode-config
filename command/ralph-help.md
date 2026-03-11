@@ -1,126 +1,119 @@
 ---
-description: 解释 Ralph Wiggum 技术和可用命令
+description: Ralph Loop 帮助信息
 ---
 
-# Ralph Wiggum 插件帮助
+# Ralph Loop 帮助
 
-请向用户解释以下内容：
+## 什么是 Ralph Loop？
 
-## 什么是 Ralph Wiggum 技术？
+Ralph Loop 是一种让 AI 持续迭代直到任务真正完成的机制。
 
-Ralph Wiggum 技术是一种基于持续 AI 循环的迭代开发方法论，由 Geoffrey Huntley 开创。
+### 核心思想
 
-**核心概念：**
-```bash
-while :; do
-  cat PROMPT.md | opencode --continue
-done
+```
+while 任务未完成:
+    AI 接收相同的提示词
+    AI 看到之前的工作
+    AI 继续推进任务
+    直到客观条件满足
 ```
 
-相同的提示词会被重复传递给 AI。"自引用"的特性来源于 AI 在文件和 git 历史中看到自己之前的工作，而不是将输出反馈作为输入。
+### 解决的问题
 
-**每次迭代：**
-1. AI 接收相同的提示词
-2. 处理任务，修改文件
-3. 完成响应
-4. 插件拦截空闲状态并再次传递相同的提示词
-5. AI 在文件中看到自己之前的工作
-6. 迭代改进直到完成
+| 问题 | 传统 Agent | Ralph Loop |
+|------|-----------|------------|
+| 自我评估 | 主观判断"完成" | 外部客观标准 |
+| 上下文管理 | 会话重启丢失 | 文件持久化 |
+| 人工干预 | 需要频繁介入 | 真正无人值守 |
 
-该技术被描述为"在不确定的世界中确定性地失败"——失败是可以预测的，从而能够通过调整提示词进行系统性改进。
+## 适用场景
+
+### ✅ 适合
+
+- 有明确的、可程序化验证的完成标准
+- 编程、测试、迁移、重构等机械性任务
+- 有现成的验证方法（测试套件、lint 等）
+
+### ❌ 不适合
+
+- 需要人工判断或设计决策
+- 成功标准模糊或主观
+- 需要频繁人工确认的交互式任务
 
 ## 可用命令
 
-### /ralph-loop <提示词> [选项]
+| 命令 | 描述 |
+|------|------|
+| `/ralph-loop` | 启动 Ralph Loop 规划流程 |
+| `/ralph-start` | 启动执行已规划的任务 |
+| `/ralph-help` | 显示此帮助信息 |
+| `/cancel-ralph` | 取消活动的 Ralph 循环 |
 
-在当前会话中启动 Ralph 循环。
+## 可用 Agent
 
-**用法：**
+| Agent | 描述 |
+|-------|------|
+| `@ralph-planner` | 规划代理：需求探索、场景设计、创建规划文件 |
+| `@ralph-executor` | 执行代理：持续迭代执行任务直到完成 |
+
+## 使用流程
+
 ```
-/ralph-loop "重构缓存层" --max-iterations 20
-/ralph-loop "添加测试" --completion-promise "测试完成"
+1. 启动规划
+   /ralph-loop 或 @ralph-planner
+
+2. 完成规划
+   - 明确需求
+   - 设计场景
+   - 定义完成承诺
+   - 确认启动
+
+3. 执行任务
+   @ralph-executor 或 /ralph-start
+
+4. 查看进度
+   cat .ralph/PROGRESS.md
+
+5. 查看学习
+   cat .ralph/LEARNING.md
 ```
 
-**选项：**
-- `--max-iterations <n>` - 自动停止前的最大迭代次数
-- `--completion-promise <文本>` - 标记完成的承诺短语
+## 文件结构
 
-**工作原理：**
-1. 创建 `.opencode/ralph-loop.local.md` 状态文件
-2. 你开始处理任务
-3. 当你完成响应时，插件会拦截
-4. 相同的提示词再次传递
-5. 你看到自己之前的工作
-6. 持续进行，直到检测到承诺或达到最大迭代次数
-
----
-
-### /cancel-ralph
-
-取消活动的 Ralph 循环（删除循环状态文件）。
-
-**用法：**
 ```
-/cancel-ralph
+.ralph/
+├── tasks.json          # 任务列表
+├── SCENARIOS.md        # 目标用例场景
+├── PROGRESS.md         # 进度记录
+├── LEARNING.md         # 学习笔记
+└── ralph-config.json   # 配置（完成承诺、迭代限制）
 ```
-
-**工作原理：**
-- 检查活动的循环状态文件
-- 删除 `.opencode/ralph-loop.local.md`
-- 报告取消并显示迭代次数
-
----
 
 ## 核心概念
 
 ### 完成承诺
 
-要标记完成，AI 必须输出一个 `<promise>` 标签：
+完成承诺是 Ralph Loop 的核心控制机制。必须是：
+- **具体**：明确可验证的条件
+- **可验证**：可通过命令确认
+- **可达成**：合理迭代次数内可达成
 
-```
-<promise>任务完成</promise>
-```
+示例：
+- "所有测试通过，覆盖率 >= 80%"
+- "pytest tests/ 通过，无失败用例"
 
-插件会查找这个特定的标签。如果没有它（或 `--max-iterations`），Ralph 将无限运行。
+### Context Rot vs In-Context Learning
 
-### 自引用机制
+| 现象 | 特征 | 影响 |
+|------|------|------|
+| Context Rot | 重复错误、冗余输出 | 性能下降 |
+| In-Context Learning | 错误反馈、成功记录 | 越跑越聪明 |
 
-"循环"并不意味着 AI 与自己对话。它的意思是：
-- 相同的提示词重复
-- AI 的工作持久保存在文件中
-- 每次迭代都能看到之前的尝试
-- 增量式地朝着目标前进
+判断标准：删除历史记录后，问题是更容易还是更难解决？
 
-## 示例
+## 学习更多
 
-### 交互式 Bug 修复
-
-```
-/ralph-loop "修复 auth.ts 中的 token 刷新逻辑。当所有测试通过时输出 <promise>已修复</promise>。" --completion-promise "已修复" --max-iterations 10
-```
-
-你会看到 Ralph：
-- 尝试修复
-- 运行测试
-- 查看失败
-- 迭代解决方案
-- 在你当前的会话中
-
-## 何时使用 Ralph
-
-**适用于：**
-- 有明确成功标准的定义清晰的任务
-- 需要迭代和改进的任务
-- 带有自我纠正的迭代开发
-- 全新项目
-
-**不适用于：**
-- 需要人工判断或设计决策的任务
-- 一次性操作
-- 成功标准不清晰的任务
-- 调试生产环境问题（改用针对性调试）
-
-## 了解更多
-
+- 技能文档：`skills/ralph-loop/SKILL.md`
+- 规划代理：`agent/ralph-planner.md`
+- 执行代理：`agent/ralph-executor.md`
 - 原始技术：https://ghuntley.com/ralph/
-- Ralph 协调器：https://github.com/mikeyobrien/ralph-orchestrator
