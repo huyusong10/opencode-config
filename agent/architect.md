@@ -675,6 +675,112 @@ def recommend_mode(task):
 
 ---
 
+## STATE.md 必填字段规范
+
+**Hook强制检查：Maker执行前会验证STATE.md的必填字段，缺失将导致执行被阻止。**
+
+### 必填字段清单
+
+```yaml
+# .planning/STATE.md
+
+## 当前位置
+阶段: [phase-id]           # 必填: 当前阶段ID
+计划: [plan-id]            # 必填: 当前计划ID
+状态: [status]             # 必填: planning | ready | executing | completed | blocked
+
+## 执行模式（必填！）
+execution_mode: [mode]     # 必填: tdd | ralph | standard | spike | debug | refactor | migrate
+                           # 默认值: tdd
+```
+
+### 字段说明
+
+| 字段 | 是否必填 | 说明 | Hook检查 |
+|------|----------|------|----------|
+| `状态` | **必填** | 必须为 `ready` 才能进入Maker执行 | architect-first-guard |
+| `execution_mode` | **必填** | 未指定时默认 `tdd` | execution-mode-guard |
+| `阶段` | 必填 | 当前阶段标识 | plan-completion-guard |
+| `计划` | 必填 | 当前计划标识 | plan-completion-guard |
+
+### execution_mode 选择指南
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              execution_mode 选择决策树                       │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  是否涉及新功能开发？                                        │
+│  ├── 是 → 是否有明确的验收标准？                             │
+│  │         ├── 是 → tdd (推荐)                              │
+│  │         └── 否 → ralph (迭代验证)                        │
+│  │                                                          │
+│  是否修复Bug？                                               │
+│  └── 是 → debug (系统化调试)                                │
+│                                                             │
+│  是否重构现有代码？                                          │
+│  └── 是 → refactor (安全重构)                              │
+│                                                             │
+│  是否进行版本/数据迁移？                                      │
+│  └── 是 → migrate (带验证迁移)                              │
+│                                                             │
+│  简单配置/脚本？                                             │
+│  └── 是 → standard (线性执行)                               │
+│                                                             │
+│  技术验证/POC？                                              │
+│  └── 是 → spike (探索性编程)                                │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 完整STATE.md模板
+
+```yaml
+# .planning/STATE.md
+
+## 当前位置
+阶段: 01-foundation
+计划: 01-01
+状态: ready
+
+## 执行模式
+execution_mode: tdd
+
+## Architect签名
+architect:
+  completed_at: "[ISO timestamp]"
+  plan_files:
+    - "phases/01-foundation/01-01-PLAN.md"
+
+## Maker执行状态（由Maker填写）
+maker:
+  started_at: null
+  current_phase: "01-foundation"
+  current_plan: "01-01"
+  current_task: null
+  test_files_created: []
+  commits: []
+
+## 归档记录
+archive: []
+
+## 进度
+[░░░░░░░░░░] 0%
+```
+
+### 完成信号
+
+**Architect完成规划后，必须将STATE.md状态设为 `ready`：**
+
+```yaml
+状态: ready
+execution_mode: tdd  # 或其他模式
+```
+
+**这是Hook放行Maker执行的关键信号。**
+
+---
+
 ## 完成协议
 
 当规划完成时：

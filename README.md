@@ -212,6 +212,84 @@ NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST
 
 ---
 
+## Hook 强制约束
+
+采用 Hook 机制强制执行工作流程规范，无法绕过：
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Hook 强制约束层                           │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Hook 1: architect-first-guard                              │
+│  触发: Write/Edit 源代码文件                                 │
+│  检查: .planning/STATE.md 存在且 status = ready              │
+│  阻止: 无 Architect 规划时拒绝执行                           │
+│                                                             │
+│  Hook 2: execution-mode-guard                               │
+│  触发: 同上                                                  │
+│  检查: STATE.md 中 execution_mode 字段存在                   │
+│  阻止: 未指定执行模式时拒绝执行                              │
+│                                                             │
+│  Hook 3: test-first-guard (TDD模式)                         │
+│  触发: TDD模式下写入实现文件                                 │
+│  检查: 对应测试文件已存在                                    │
+│  阻止: 必须先写测试再写实现                                  │
+│                                                             │
+│  Hook 4: plan-completion-guard                              │
+│  触发: 标记 plan 完成时                                      │
+│  检查: 所有任务已完成 + 验证通过                             │
+│  阻止: 部分完成时拒绝标记为完成                              │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### STATE.md 必填字段
+
+```yaml
+## 当前位置
+阶段: [phase-id]           # 必填
+计划: [plan-id]            # 必填
+状态: ready                 # 必填: ready 才能执行
+
+## 执行模式（必填）
+execution_mode: tdd        # 必填: tdd | ralph | standard | debug | refactor | migrate
+```
+
+---
+
+## 任务日志系统
+
+每个任务执行自动记录日志，用于复盘和优化：
+
+### 日志目录
+
+```
+.planning/.logs/
+├── sessions/[session-id]/*.jsonl  # 按会话
+├── daily/YYYY-MM-DD.jsonl         # 按日期
+└── tasks/[phase-plan].jsonl       # 按任务
+```
+
+### 使用方式
+
+```bash
+# 记录任务开始
+npx tsx scripts/task-logger.ts task-start \
+  --session abc123 --phase 01-foundation --plan 01-01 \
+  --task "Task 1: Create auth types"
+
+# 记录任务完成
+npx tsx scripts/task-logger.ts complete \
+  --session abc123 --task "Task 1" \
+  --files "src/types/auth.ts" --duration 300000
+
+# 生成会话摘要
+npx tsx scripts/task-logger.ts summary --session abc123
+```
+
+---
+
 ## 目录结构
 
 ```
@@ -231,7 +309,10 @@ opencode-config/
 ├── command/               # 自定义 Command 定义
 ├── skills/
 │   └── ralph-loop/        # Ralph Loop 技能
-└── plugin/                # 插件
+├── plugin/
+│   └── guard.ts           # Hook 强制约束插件
+└── scripts/
+    └── task-logger.ts     # 任务日志记录脚本
 ```
 
 ---
