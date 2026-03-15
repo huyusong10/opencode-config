@@ -27,15 +27,6 @@
             }
           }
         },
-        "qwen3-max-2026-01-23": {
-          "name": "Qwen3 Max 2026-01-23"
-        },
-        "qwen3-coder-next": {
-          "name": "Qwen3 Coder Next"
-        },
-        "qwen3-coder-plus": {
-          "name": "Qwen3 Coder Plus"
-        },
         "MiniMax-M2.5": {
           "name": "MiniMax M2.5",
           "options": {
@@ -47,15 +38,6 @@
         },
         "glm-5": {
           "name": "GLM-5",
-          "options": {
-            "thinking": {
-              "type": "enabled",
-              "budgetTokens": 1024
-            }
-          }
-        },
-        "glm-4.7": {
-          "name": "GLM-4.7",
           "options": {
             "thinking": {
               "type": "enabled",
@@ -300,9 +282,14 @@
     }
   },
   "plugin": [
-    "@mohak34/opencode-notifier@latest", 
-    "opencode-pty@latest", 
+    "@mohak34/opencode-notifier@latest",
+    "opencode-pty@latest",
     "@my-org/custom-plugin",
     "./plugin/guard.ts"
+  ],
+  "instructions": [
+    "rules/ascii-diagrams.md",
+    "rules/codeact.md",
+    "rules/subagent.md"
   ]
 }
