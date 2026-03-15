@@ -2,6 +2,40 @@
 
 个人 OpenCode AI 编程助手配置，聚焦于**规范化开发流程**和**可复用的工作流**。
 
+## 安装
+
+### 一键安装 (macOS/Linux)
+
+```bash
+# 软链接模式（推荐，便于 git pull 更新）
+curl -fsSL https://raw.githubusercontent.com/USER/REPO/main/install.sh | bash
+
+# 复制模式（独立安装）
+curl -fsSL https://raw.githubusercontent.com/USER/REPO/main/install.sh | bash -s -- --copy
+```
+
+### 手动安装
+
+```bash
+# macOS/Linux - 软链接模式
+git clone https://github.com/USER/REPO.git ~/opencode-config && cd ~/opencode-config && ./install.sh
+
+# macOS/Linux - 复制模式
+git clone https://github.com/USER/REPO.git ~/opencode-config && cd ~/opencode-config && ./install.sh --copy
+
+# Windows (PowerShell 管理员) - 复制模式
+git clone https://github.com/USER/REPO.git $env:USERPROFILE\opencode-config; Copy-Item -Recurse -Force $env:USERPROFILE\opencode-config\* $env:APPDATA\opencode\
+```
+
+### 更新配置
+
+```bash
+cd ~/opencode-config && git pull   # 软链接模式
+curl -fsSL https://raw.githubusercontent.com/USER/REPO/main/install.sh | bash  # 重新安装
+```
+
+---
+
 ## 核心思想
 
 ### 1. 规范驱动开发（Spec-Driven Development）
