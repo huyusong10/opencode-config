@@ -43,28 +43,28 @@ curl -fsSL https://raw.githubusercontent.com/huyusong10/opencode-config/main/ins
 采用 **Architect + Maker** 双前端架构，清晰分离规划与执行：
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        用户请求                                  │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                     Architect (架构师)                          │
-│                                                                 │
-│  职责：理解需求、设计解决方案、创建可执行计划                     │
-│  输出：.planning/ 目录结构（PROJECT.md, REQUIREMENTS.md, etc.）  │
-│  委托：@researcher 进行技术研究                                  │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                       Maker (制造者)                            │
-│                                                                 │
-│  职责：执行计划、协调子代理、管理状态                             │
-│  模式：ralph | tdd | standard | spike | debug | refactor | migrate │
-│  协调：@coder, @tester, @debugger, @reviewer, @researcher,      │
-│        @committer                                               │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              User Request                                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                       │
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           Architect                                         │
+│                                                                             │
+│  Responsibilities: Understand requirements, design solution, create plan    │
+│  Outputs: .planning/ directory (PROJECT.md, REQUIREMENTS.md, etc.)          │
+│  Delegates: @researcher for technical research                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                       │
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                             Maker                                           │
+│                                                                             │
+│  Responsibilities: Execute plan, coordinate subagents, manage state         │
+│  Modes: ralph | tdd | standard | spike | debug | refactor | migrate         │
+│  Coordinates: @coder, @tester, @debugger, @reviewer, @researcher,           │
+│               @committer                                                    │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### 功能型 Subagent
@@ -97,24 +97,24 @@ curl -fsSL https://raw.githubusercontent.com/huyusong10/opencode-config/main/ins
 ### 工作流一：标准开发流程
 
 ```
-@architect <需求描述>
+@architect <requirement>
     ↓
-┌─────────────────────────────────────────────────────────────────┐
-│  1. 需求探索（用户故事 + 验收标准）                              │
-│  2. 技术研究（委托 @researcher）                                │
-│  3. 创建 .planning/ 目录结构                                    │
-│  4. 推荐执行模式                                                │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  1. Requirements Exploration (user stories + acceptance criteria)           │
+│  2. Technical Research (delegate to @researcher)                            │
+│  3. Create .planning/ directory structure                                   │
+│  4. Recommend execution mode                                                │
+└─────────────────────────────────────────────────────────────────────────────┘
     ↓
 @maker
     ↓
-┌─────────────────────────────────────────────────────────────────┐
-│  1. 读取 PLAN.md                                                │
-│  2. 调度到对应 subagent                                         │
-│  3. 验证验收标准                                                │
-│  4. 协调 @committer 提交                                        │
-│  5. 更新 STATE.md                                               │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  1. Read PLAN.md                                                            │
+│  2. Dispatch to appropriate subagent                                        │
+│  3. Validate acceptance criteria                                            │
+│  4. Coordinate @committer for commit                                        │
+│  5. Update STATE.md                                                         │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### 工作流二：Ralph Loop 迭代
@@ -122,18 +122,18 @@ curl -fsSL https://raw.githubusercontent.com/huyusong10/opencode-config/main/ins
 **适用场景**：需要 AI 自我观察、持续改进的复杂任务
 
 ```
-/ralph-loop --max-iterations 10 --completion-promise "<完成标志>"
+/ralph-loop --max-iterations 10 --completion-promise "<completion-flag>"
     ↓
-┌─────────────────────────────────────────────────────────────────┐
-│  循环执行直到：                                                  │
-│    - AI 在输出中写入 <promise> 完成标志                          │
-│    - 达到最大迭代次数                                            │
-│                                                                  │
-│  每次 AI 都能看到：                                              │
-│    - 之前的输出历史                                              │
-│    - git 提交历史                                                │
-│    - 文件变更记录                                                │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  Loop until:                                                                │
+│    - AI writes <promise> completion flag in output                          │
+│    - Max iterations reached                                                 │
+│                                                                             │
+│  AI can see each iteration:                                                 │
+│    - Previous output history                                                │
+│    - Git commit history                                                     │
+│    - File change history                                                    │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 **停止方式**：AI 输出包含 `<promise>` 标签，或执行 `/cancel-ralph`
@@ -145,24 +145,24 @@ curl -fsSL https://raw.githubusercontent.com/huyusong10/opencode-config/main/ins
 ```
 @debugger
     ↓
-┌─────────────────────────────────────────────────────────────────┐
-│  阶段一：根本原因调查                                            │
-│    - 阅读错误信息                                                │
-│    - 复现问题                                                    │
-│    - 追踪数据流                                                  │
-│  阶段二：模式分析                                                │
-│    - 找到可工作的示例                                            │
-│    - 比较差异                                                    │
-│  阶段三：假设与测试                                              │
-│    - 形成单一假设                                                │
-│    - 最小化测试验证                                              │
-│  阶段四：实施修复                                                │
-│    - 先写失败测试用例                                            │
-│    - 修复并验证                                                  │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  Phase 1: Root Cause Investigation                                          │
+│    - Read error messages                                                    │
+│    - Reproduce the issue                                                    │
+│    - Trace data flow                                                        │
+│  Phase 2: Pattern Analysis                                                  │
+│    - Find working examples                                                  │
+│    - Compare differences                                                    │
+│  Phase 3: Hypothesis & Testing                                              │
+│    - Form single hypothesis                                                 │
+│    - Minimal verification test                                              │
+│  Phase 4: Implement Fix                                                     │
+│    - Write failing test first                                               │
+│    - Fix and verify                                                         │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**铁律**：没有根本原因调查就没有修复。
+**铁律**：没有根因调查就没有修复。
 
 ---
 
@@ -217,43 +217,43 @@ NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST
 采用 Hook 机制强制执行工作流程规范，无法绕过：
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Hook 强制约束层                           │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  Hook 1: architect-first-guard                              │
-│  触发: Write/Edit 源代码文件                                 │
-│  检查: .planning/STATE.md 存在且 status = ready              │
-│  阻止: 无 Architect 规划时拒绝执行                           │
-│                                                             │
-│  Hook 2: execution-mode-guard                               │
-│  触发: 同上                                                  │
-│  检查: STATE.md 中 execution_mode 字段存在                   │
-│  阻止: 未指定执行模式时拒绝执行                              │
-│                                                             │
-│  Hook 3: test-first-guard (TDD模式)                         │
-│  触发: TDD模式下写入实现文件                                 │
-│  检查: 对应测试文件已存在                                    │
-│  阻止: 必须先写测试再写实现                                  │
-│                                                             │
-│  Hook 4: plan-completion-guard                              │
-│  触发: 标记 plan 完成时                                      │
-│  检查: 所有任务已完成 + 验证通过                             │
-│  阻止: 部分完成时拒绝标记为完成                              │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         Hook Enforcement Layer                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Hook 1: architect-first-guard                                              │
+│  Trigger: Write/Edit source code files                                      │
+│  Check: .planning/STATE.md exists with status = ready                       │
+│  Block: Reject execution without Architect plan                             │
+│                                                                             │
+│  Hook 2: execution-mode-guard                                               │
+│  Trigger: Same as above                                                     │
+│  Check: execution_mode field exists in STATE.md                             │
+│  Block: Reject execution without specified mode                             │
+│                                                                             │
+│  Hook 3: test-first-guard (TDD mode)                                        │
+│  Trigger: Write implementation in TDD mode                                  │
+│  Check: Corresponding test file exists                                      │
+│  Block: Must write test before implementation                               │
+│                                                                             │
+│  Hook 4: plan-completion-guard                                              │
+│  Trigger: Mark plan as complete                                             │
+│  Check: All tasks completed + verified                                      │
+│  Block: Reject marking partial work as complete                             │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### STATE.md 必填字段
 
 ```yaml
 ## 当前位置
-阶段: [phase-id]           # 必填
-计划: [plan-id]            # 必填
-状态: ready                 # 必填: ready 才能执行
+阶段：[phase-id]           # 必填
+计划：[plan-id]            # 必填
+状态：ready                 # 必填：ready 才能执行
 
 ## 执行模式（必填）
-execution_mode: tdd        # 必填: tdd | ralph | standard | debug | refactor | migrate
+execution_mode: tdd        # 必填：tdd | ralph | standard | debug | refactor | migrate
 ```
 
 ---
