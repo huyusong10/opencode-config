@@ -63,12 +63,21 @@ cat src/similar-feature/index.ts
 cat package.json | grep -A 50 dependencies
 ```
 
-**外部来源：**
+**外部来源（优先级顺序）：**
 
-- 官方文档（context7 工具）
-- GitHub 仓库（gh_grep）
-- 技术博客和文章（websearch）
-- API 文档（webfetch）
+1. **官方文档** - 最权威（context7 工具）
+2. **GitHub 仓库** - 真实示例（gh_grep）
+3. **技术博客** - 深度解析（websearch）
+4. **API 文档** - 接口规范（webfetch）
+5. **Stack Overflow** - 具体问题解决方案
+6. **社区论坛** - 讨论和观点
+
+**可信度评估：**
+
+- 官方来源 > 社区来源
+- 近期内容 > 过时内容
+- 多来源一致 > 单一来源
+- 可用示例 > 理论解释
 
 ### 3. 评估选项
 

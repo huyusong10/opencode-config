@@ -424,12 +424,53 @@ npm run build
 
 ---
 
-## 使用的 Skills
+## 协调的 Subagent
 
-- **committer** - Git 提交
-- **verification-before-completion** - 最终验证
-- **tdd-workflow** - TDD 模式专用
-- **systematic-debugging** - Debug 模式专用
+| Subagent | 触发条件 |
+|----------|---------|
+| @coder | 需要编写/修改代码 |
+| @tester | 需要编写/运行测试 |
+| @debugger | 测试失败，需要修复 |
+| @reviewer | 需要代码审查 |
+| @researcher | 需要技术研究 |
+| @committer | 需要 Git 提交 |
+
+---
+
+## TDD 模式执行
+
+当 `execution_mode: tdd` 时，执行 RED-GREEN-REFACTOR 循环：
+
+```
+RED  → @tester (编写失败测试)
+GREEN → @coder (最小化实现)
+REFACTOR → @reviewer + @coder
+```
+
+**铁律：**
+- 先写失败测试，再实现代码
+- 测试必须先失败（证明测试有效）
+- 实现最小化（只让测试通过，不多写）
+- 重构不改变行为
+
+---
+
+## Debug 模式执行
+
+当 `execution_mode: debug` 时，执行系统化调试：
+
+```
+@debugger → @tester → 完成
+```
+
+**调试方法论：**
+1. 复现问题 - 确认 bug 存在且可复现
+2. 隔离问题 - 缩小问题来源范围
+3. 根因分析 - 确定 bug 发生的原因
+4. 最小修复 - 针对根因做最小化修复
+5. 验证修复 - 确认修复有效且无回归
+
+**铁律：没有根因调查，没有修复。**
 
 ---
 

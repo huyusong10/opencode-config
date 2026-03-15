@@ -1,6 +1,6 @@
 # OpenCode 配置仓库
 
-个人 OpenCode AI 编程助手配置，聚焦于**规范化开发流程**和**可复用的工作流**。
+个人 OpenCode AI 编程助手配置，聚焦于**双前端 Agent 架构**和**Ralph Loop 迭代机制**。
 
 ## 安装
 
@@ -8,251 +8,207 @@
 
 ```bash
 # 软链接模式（推荐，便于 git pull 更新）
-curl -fsSL https://raw.githubusercontent.com/USER/REPO/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/huyusong10/opencode-config/main/install.sh | bash
 
 # 复制模式（独立安装）
-curl -fsSL https://raw.githubusercontent.com/USER/REPO/main/install.sh | bash -s -- --copy
+curl -fsSL https://raw.githubusercontent.com/huyusong10/opencode-config/main/install.sh | bash -s -- --copy
 ```
 
 ### 手动安装
 
 ```bash
 # macOS/Linux - 软链接模式
-git clone https://github.com/USER/REPO.git ~/opencode-config && cd ~/opencode-config && ./install.sh
+git clone https://github.com/huyusong10/opencode-config.git ~/opencode-config && cd ~/opencode-config && ./install.sh
 
 # macOS/Linux - 复制模式
-git clone https://github.com/USER/REPO.git ~/opencode-config && cd ~/opencode-config && ./install.sh --copy
+git clone https://github.com/huyusong10/opencode-config.git ~/opencode-config && cd ~/opencode-config && ./install.sh --copy
 
 # Windows (PowerShell 管理员) - 复制模式
-git clone https://github.com/USER/REPO.git $env:USERPROFILE\opencode-config; Copy-Item -Recurse -Force $env:USERPROFILE\opencode-config\* $env:APPDATA\opencode\
+git clone https://github.com/huyusong10/opencode-config.git $env:USERPROFILE\opencode-config; Copy-Item -Recurse -Force $env:USERPROFILE\opencode-config\* $env:APPDATA\opencode\
 ```
 
 ### 更新配置
 
 ```bash
 cd ~/opencode-config && git pull   # 软链接模式
-curl -fsSL https://raw.githubusercontent.com/USER/REPO/main/install.sh | bash  # 重新安装
+curl -fsSL https://raw.githubusercontent.com/huyusong10/opencode-config/main/install.sh | bash  # 重新安装
 ```
 
 ---
 
-## 核心思想
+## 核心架构
 
-### 1. 规范驱动开发（Spec-Driven Development）
+### 双前端模式
 
-将需求→实现→测试的完整生命周期编码为状态机，每个阶段由专门的 Agent 负责：
+采用 **Architect + Maker** 双前端架构，清晰分离规划与执行：
 
 ```
-需求请求 → Draft → (可行性验证) → Active → (实现+审查+测试) → Realized
-                                                              ↓
-                                           (功能变更时) → Regressible → (回归验证) → Realized
+┌─────────────────────────────────────────────────────────────────┐
+│                        用户请求                                  │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     Architect (架构师)                          │
+│                                                                 │
+│  职责：理解需求、设计解决方案、创建可执行计划                     │
+│  输出：.planning/ 目录结构（PROJECT.md, REQUIREMENTS.md, etc.）  │
+│  委托：@researcher 进行技术研究                                  │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                       Maker (制造者)                            │
+│                                                                 │
+│  职责：执行计划、协调子代理、管理状态                             │
+│  模式：ralph | tdd | standard | spike | debug | refactor | migrate │
+│  协调：@coder, @tester, @debugger, @reviewer, @researcher,      │
+│        @committer                                               │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-**价值**：避免"一次性代码"，确保每个功能都有明确的规范、验证和回归保护。
+### 功能型 Subagent
 
-### 2. 职责分离（Separation of Concerns）
+| Subagent | 职责 | 工具权限 |
+|----------|------|---------|
+| @coder | 根据规格说明实现代码 | 读写 |
+| @tester | 编写和运行测试验证实现 | 读写 + PTY |
+| @debugger | 系统性诊断和修复 bug | 读写 + PTY |
+| @reviewer | 审查代码正确性和质量 | 只读 |
+| @researcher | 研究技术、模式和解决方案 | 只读 |
+| @committer | 原子化 git 提交 | 只读 + bash |
 
-每个 Agent 只做一件事，且只做好一件事：
-- `spec-write` 只写规范，不碰代码
-- `spec-feasible` 只做可行性研究，只读
-- `spec-implement` 只实现，不修改规范
-- `spec-review` 只审查，只读
-- `committer` 只处理 git 提交
+### 执行模式选择
 
-**价值**：通过只读约束保证审查的公正性，通过单一职责降低错误率。
-
-### 3. TDD for Everything
-
-将测试驱动开发的思想扩展到更广范围：
-- **Skills 编写**：先记录失败场景（RED），再编写技能文档（GREEN），最后堵住漏洞（REFACTOR）
-- **代码开发**：完整的 7 步 TDD 循环
-- **完成验证**：没有验证证据就不声明完成
-
-### 4. 自引用迭代（Ralph Wiggum）
-
-让 AI 看到自己的历史工作，形成自我改进的反馈循环。适用于需要多次迭代的复杂任务。
+| 模式 | 使用时机 | 流程 |
+|------|----------|------|
+| **ralph** (默认) | 大多数开发任务 | @coder → @tester → 循环直到通过 |
+| **tdd** | 业务逻辑、算法、API | RED → GREEN → REFACTOR |
+| **standard** | 简单配置、脚本、样式 | @coder → @reviewer → 完成 |
+| **spike** | 技术验证、POC | @researcher → @coder → 完成 |
+| **debug** | Bug 修复 | @debugger → @tester → 完成 |
+| **refactor** | 代码改进 | @reviewer → @coder → @tester → 完成 |
+| **migrate** | 版本/数据迁移 | @coder → @tester → 完成 |
 
 ---
 
 ## 工作流
 
-### 工作流一：规范驱动开发
-
-**适用场景**：新功能开发、功能重构、需要质量保障的关键代码
+### 工作流一：标准开发流程
 
 ```
-/spec-orchestrator <功能描述>
+@architect <需求描述>
     ↓
-┌─────────────────────────────────────────────────────────┐
-│  1. @spec-write 创建 Draft 规范                         │
-│  2. @spec-feasible 验证可行性（幻觉检查、外部验证）      │
-│  3. @spec-implement 实现 Active 规范                    │
-│  4. @spec-review 审查实现是否符合规范                   │
-│  5. @spec-test 执行测试步骤                             │
-│  6. 规范变为 Realized 状态                              │
-└─────────────────────────────────────────────────────────┘
-```
-
-**文件产出**：`specs/<功能名>.md`
-
-### 工作流二：任务规划与执行
-
-**适用场景**：有明确任务列表的批量工作
-
-```
-@task-planner <目标描述>
-    ↓ 生成 tasks.json
-@task-executor
+┌─────────────────────────────────────────────────────────────────┐
+│  1. 需求探索（用户故事 + 验收标准）                              │
+│  2. 技术研究（委托 @researcher）                                │
+│  3. 创建 .planning/ 目录结构                                    │
+│  4. 推荐执行模式                                                │
+└─────────────────────────────────────────────────────────────────┘
     ↓
-┌─────────────────────────────────────────────────────────┐
-│  循环读取 tasks.json 中的待办任务：                      │
-│    → @worker 实现任务（遵循验收标准）                    │
-│    → 更新 PROGRESS.txt                                  │
-│  所有任务完成后：                                        │
-│    → @committer 提交变更                                │
-└─────────────────────────────────────────────────────────┘
+@maker
+    ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  1. 读取 PLAN.md                                                │
+│  2. 调度到对应 subagent                                         │
+│  3. 验证验收标准                                                │
+│  4. 协调 @committer 提交                                        │
+│  5. 更新 STATE.md                                               │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-**文件产出**：`tasks.json`、`PROGRESS.txt`
-
-### 工作流三：Ralph 循环迭代
+### 工作流二：Ralph Loop 迭代
 
 **适用场景**：需要 AI 自我观察、持续改进的复杂任务
 
 ```
 /ralph-loop --max-iterations 10 --completion-promise "<完成标志>"
     ↓
-┌─────────────────────────────────────────────────────────┐
-│  循环执行直到：                                          │
-│    - AI 在输出中写入 <promise> 完成标志                  │
-│    - 达到最大迭代次数                                    │
-│                                                          │
-│  每次 AI 都能看到：                                      │
-│    - 之前的输出历史                                      │
-│    - git 提交历史                                        │
-│    - 文件变更记录                                        │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│  循环执行直到：                                                  │
+│    - AI 在输出中写入 <promise> 完成标志                          │
+│    - 达到最大迭代次数                                            │
+│                                                                  │
+│  每次 AI 都能看到：                                              │
+│    - 之前的输出历史                                              │
+│    - git 提交历史                                                │
+│    - 文件变更记录                                                │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 **停止方式**：AI 输出包含 `<promise>` 标签，或执行 `/cancel-ralph`
 
-### 工作流四：系统化调试
+### 工作流三：系统化调试
 
 **适用场景**：遇到 bug、测试失败、意外行为
 
 ```
-加载 skill: systematic-debugging
+@debugger
     ↓
-┌─────────────────────────────────────────────────────────┐
-│  阶段一：根本原因调查                                    │
-│    - 阅读错误信息                                        │
-│    - 复现问题                                            │
-│    - 追踪数据流                                          │
-│  阶段二：模式分析                                        │
-│    - 找到可工作的示例                                    │
-│    - 比较差异                                            │
-│  阶段三：假设与测试                                      │
-│    - 形成单一假设                                        │
-│    - 最小化测试验证                                      │
-│  阶段四：实施修复                                        │
-│    - 先写失败测试用例                                    │
-│    - 修复并验证                                          │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│  阶段一：根本原因调查                                            │
+│    - 阅读错误信息                                                │
+│    - 复现问题                                                    │
+│    - 追踪数据流                                                  │
+│  阶段二：模式分析                                                │
+│    - 找到可工作的示例                                            │
+│    - 比较差异                                                    │
+│  阶段三：假设与测试                                              │
+│    - 形成单一假设                                                │
+│    - 最小化测试验证                                              │
+│  阶段四：实施修复                                                │
+│    - 先写失败测试用例                                            │
+│    - 修复并验证                                                  │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 **铁律**：没有根本原因调查就没有修复。
 
-### 工作流五：仓库分析
+---
 
-**适用场景**：快速理解陌生代码库
+## Skills
 
-```
-/repo-analyser
-    ↓
-┌─────────────────────────────────────────────────────────┐
-│  并行启动 10 个探索 Agent，分别关注：                    │
-│    - 项目结构与入口点                                    │
-│    - 核心业务逻辑                                        │
-│    - 数据模型与存储                                      │
-│    - 外部依赖与集成                                      │
-│    - 测试策略                                            │
-│    - ...                                                 │
-│  最终生成 CODEBASE.md 文档                               │
-└─────────────────────────────────────────────────────────┘
-```
+当前仅保留一个核心 Skill：
+
+| Skill | 何时使用 |
+|-------|----------|
+| `ralph-loop` | 需要持续迭代直到任务真正完成的长任务 |
+
+其他能力已整合到 Agent/Subagent 中：
+- 需求探索 → architect.md
+- TDD 流程 → maker.md
+- 调试方法论 → debugger.md
+- Git 提交 → @committer
+- 外部研究 → @researcher
 
 ---
 
-## Skills 使用指南
+## 铁律
 
-Skills 是可加载的知识模块，在特定场景下自动注入上下文。
+### 完成前验证
 
-### 开发类
-
-| Skill | 何时使用 |
-|-------|----------|
-| `writing-python` | Python 项目开发，自动遵循 uv + Ruff + Pyright 工具链 |
-| `writing-bash-scripts` | 编写 Shell 脚本，自动应用严格模式和 Shellcheck |
-| `tdd-workflow` | 严格的测试驱动开发流程 |
-
-### 验证类
-
-| Skill | 何时使用 |
-|-------|----------|
-| `verification-before-completion` | 任务完成前，强制执行验证流程 |
-| `testing-safe-protocol` | 测试可能产生副作用的代码前，确保安全 |
-
-### 调试类
-
-| Skill | 何时使用 |
-|-------|----------|
-| `systematic-debugging` | 遇到任何 bug 或失败 |
-| `mistake-notebook` | 查询或记录历史错误解决方案 |
-
-### 流程类
-
-| Skill | 何时使用 |
-|-------|----------|
-| `spec-document` | 编写规范文档时，提供标准模板 |
-| `defining-requirements` | 作为产品经理定义需求 |
-
-### 工具类
-
-| Skill | 何时使用 |
-|-------|----------|
-| `agent-browser` | 需要浏览器自动化（截图、爬虫、E2E 测试） |
-| `color-themes` | 为应用选择配色方案 |
-
----
-
-## 最佳实践
-
-### 何时使用规范驱动开发？
-
-- ✅ 新功能开发
-- ✅ 复杂重构
-- ✅ 需要回归保护的功能
-- ❌ 简单 bug 修复（用 `systematic-debugging`）
-- ❌ 快速原型验证
-
-### 何时使用 Ralph 循环？
-
-- ✅ 需要多次迭代的复杂任务
-- ✅ AI 需要看到自己之前的工作来改进
-- ❌ 简单的一次性任务
-
-### Skills 的使用方式
-
-Skills 通过 `/skill` 命令或自动触发加载。加载后，AI 会获得该领域的完整方法论上下文。
-
-示例：
 ```
-# 手动加载
-加载 skill: tdd-workflow
+声明之前先求证，始终如此。
 
-# 自动触发（由 skill 定义中的 trigger 字段决定）
-遇到 bug 时自动加载 systematic-debugging
+BEFORE claiming any status:
+1. IDENTIFY: What command proves this claim?
+2. RUN: Execute the FULL command
+3. READ: Full output, check exit code
+4. VERIFY: Does output confirm the claim?
+5. ONLY THEN: Make the claim
 ```
+
+### 调试铁律
+
+```
+NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST
+```
+
+### 提交铁律
+
+- 每个提交应该是一个逻辑变更单元
+- 永远不要提交密钥、API 密钥或凭据
+- 完成每个任务后提交，而不是多个任务后才提交
 
 ---
 
@@ -260,10 +216,38 @@ Skills 通过 `/skill` 命令或自动触发加载。加载后，AI 会获得该
 
 ```
 opencode-config/
-├── opencode.json      # 主配置（provider、model、mcp）
-├── AGENTS.md          # AI 行为偏好
-├── agent/             # 自定义 Agent 定义
-├── command/           # 自定义 Command 定义
-├── skills/            # Skills 知识模块
-└── plugin/            # 插件（如 Ralph 循环）
+├── opencode.json          # 主配置（provider、model、mcp）
+├── AGENTS.md              # AI 行为偏好
+├── agent/
+│   ├── architect.md       # 架构师 Agent
+│   ├── maker.md           # 制造者 Agent
+│   └── subagent/          # 功能型子代理
+│       ├── coder.md
+│       ├── tester.md
+│       ├── debugger.md
+│       ├── reviewer.md
+│       ├── researcher.md
+│       └── committer.md
+├── command/               # 自定义 Command 定义
+├── skills/
+│   └── ralph-loop/        # Ralph Loop 技能
+└── plugin/                # 插件
 ```
+
+---
+
+## 设计理念
+
+### 职责分离
+
+每个 Agent/Subagent 只做一件事：
+- `architect` 只规划，不碰代码
+- `maker` 只协调，不直接实现
+- `@coder` 只实现，不修改规范
+- `@reviewer` 只审查，只读权限
+
+**价值**：通过只读约束保证审查的公正性，通过单一职责降低错误率。
+
+### 自引用迭代
+
+让 AI 看到自己的历史工作，形成自我改进的反馈循环。适用于需要多次迭代的复杂任务。

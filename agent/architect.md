@@ -336,15 +336,9 @@ def recommend_mode(task):
 
 ---
 
-## 使用的技能
-
-- **defining-requirements** - 需求探索
-- **web-scraper** - 外部研究
-- **verification-before-completion** - 计划验证
-
 ## 委托的 Subagent
 
-- **@researcher** - 技术研究
+- **@researcher** - 技术研究和外部资源调查
 - **@explorer** (内置) - 代码库探索
 
 ---
@@ -378,6 +372,62 @@ def recommend_mode(task):
 @maker
 ```
 ```
+
+---
+
+## 需求探索方法
+
+### 用户故事格式
+
+> 作为一个 **[用户类型]**，我想要 **[某个目标]**，以便 **[某个原因]**。
+
+**示例：**
+> 作为一个 **频繁旅行者**，我想要 **保存我的支付详情**，以便 **更快地预订机票**。
+
+### 验收标准格式 (Gherkin)
+
+```gherkin
+Scenario: Save payment details
+  Given I am a logged-in user
+  When I enter valid credit card information
+  And I check "Save this card for future use"
+  And I submit the payment
+  Then my card should be securely saved
+  And I should see it as an option on my next booking
+```
+
+### 需求探索检查清单
+
+- [ ] 用户故事已定义（谁、做什么、为什么）
+- [ ] 验收标准可测试
+- [ ] 边界情况已考虑
+- [ ] 非功能性需求已识别
+
+---
+
+## 计划验证铁律
+
+**核心原则：声明之前先求证，始终如此。**
+
+```
+BEFORE claiming any status or expressing satisfaction:
+
+1. IDENTIFY: What command proves this claim?
+2. RUN: Execute the FULL command (fresh, complete)
+3. READ: Full output, check exit code, count failures
+4. VERIFY: Does output confirm the claim?
+   - If NO: State actual status with evidence
+   - If YES: State claim WITH evidence
+5. ONLY THEN: Make the claim
+
+Skip any step = lying, not verifying
+```
+
+**危险信号 - 停止：**
+
+- 使用"应该"、"可能"、"似乎"
+- 在验证前表达满意（"太好了！"、"完美！"、"完成了！"）
+- 准备提交/推送/创建 PR 但未验证
 
 ---
 
