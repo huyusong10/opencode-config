@@ -289,6 +289,8 @@
       "enabled": false
     }
   },
+  "model": "alibaba-coding-plan/qwen3.5-plus",
+  "small_model": "alibaba-coding-plan/qwen3.5-plus",
   "permission": {
     "external_directory": {
         "*": "ask",
