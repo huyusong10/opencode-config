@@ -1,6 +1,6 @@
 # OpenCode 配置仓库
 
-个人 OpenCode AI 编程助手配置，聚焦于**双前端 Agent 架构**和**Ralph Loop 迭代机制**。
+个人 OpenCode AI 编程助手配置，聚焦于**双前端 Agent 架构**和**Hook 强制约束机制**。
 
 ## 安装
 
@@ -80,6 +80,8 @@ curl -fsSL https://raw.githubusercontent.com/huyusong10/opencode-config/main/ins
 
 ### 执行模式选择
 
+由 Architect 在规划阶段推荐，Maker 执行：
+
 | 模式 | 使用时机 | 流程 |
 |------|----------|------|
 | **ralph** (默认) | 大多数开发任务 | @coder → @tester → 循环直到通过 |
@@ -94,75 +96,154 @@ curl -fsSL https://raw.githubusercontent.com/huyusong10/opencode-config/main/ins
 
 ## 工作流
 
-### 工作流一：标准开发流程
+### Architect 工作流
+
+Architect 负责理解需求、设计解决方案并创建可执行的开发计划。
 
 ```
-@architect <requirement>
-    ↓
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  1. Requirements Exploration (user stories + acceptance criteria)           │
-│  2. Technical Research (delegate to @researcher)                            │
-│  3. Create .planning/ directory structure                                   │
-│  4. Recommend execution mode                                                │
-└─────────────────────────────────────────────────────────────────────────────┘
-    ↓
-@maker
-    ↓
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  1. Read PLAN.md                                                            │
-│  2. Dispatch to appropriate subagent                                        │
-│  3. Validate acceptance criteria                                            │
-│  4. Coordinate @committer for commit                                        │
-│  5. Update STATE.md                                                         │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-### 工作流二：Ralph Loop 迭代
-
-**适用场景**：需要 AI 自我观察、持续改进的复杂任务
-
-```
-/ralph-loop --max-iterations 10 --completion-promise "<completion-flag>"
-    ↓
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  Loop until:                                                                │
-│    - AI writes <promise> completion flag in output                          │
-│    - Max iterations reached                                                 │
+│                        Architect Workflow                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
-│  AI can see each iteration:                                                 │
-│    - Previous output history                                                │
-│    - Git commit history                                                     │
-│    - File change history                                                    │
+│  Phase 1: Exploration                                                       │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ - Ask clarifying questions (What/Why/Who/Constraints)               │   │
+│  │ - Collect project context (git status, tech stack)                  │   │
+│  │ - Interactive requirement exploration (user stories, edge cases)    │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                     ↓                                       │
+│  Phase 2: Research                                                          │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ - Level 0: Skip (follow existing patterns)                          │   │
+│  │ - Level 1: Use context7 for quick validation                        │   │
+│  │ - Level 2: Delegate to @researcher (choose between options)         │   │
+│  │ - Level 3: Full research cycle (architecture decisions)             │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                     ↓                                       │
+│  Phase 3: Planning                                                          │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ - Goal-Backward Methodology:                                        │   │
+│  │   State goal -> Derive truths -> Derive artifacts                   │   │
+│  │   -> Derive connections -> Identify key links                       │   │
+│  │ - Create .planning/ directory structure:                            │   │
+│  │   PROJECT.md, REQUIREMENTS.md, ROADMAP.md, STATE.md                 │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                     ↓                                       │
+│  Phase 4: Phase Planning                                                    │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ - Dependency analysis and Wave grouping (parallel vs serial)        │   │
+│  │ - Create phases/[phase-name]/:                                      │   │
+│  │   CONTEXT.md (phase decisions), PLAN.md (execution plan)            │   │
+│  │ - Recommend execution mode (ralph/tdd/standard/spike/debug/...)     │   │
+│  │ - Set STATE.md status = ready                                       │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                     ↓                                       │
+│  Output: .planning/ ready for Maker execution                               │
+│                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**停止方式**：AI 输出包含 `<promise>` 标签，或执行 `/cancel-ralph`
+### Maker 工作流
 
-### 工作流三：系统化调试
-
-**适用场景**：遇到 bug、测试失败、意外行为
+Maker 负责执行 Architect 创建的计划，协调 subagent 并管理状态。
 
 ```
-@debugger
-    ↓
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  Phase 1: Root Cause Investigation                                          │
-│    - Read error messages                                                    │
-│    - Reproduce the issue                                                    │
-│    - Trace data flow                                                        │
-│  Phase 2: Pattern Analysis                                                  │
-│    - Find working examples                                                  │
-│    - Compare differences                                                    │
-│  Phase 3: Hypothesis & Testing                                              │
-│    - Form single hypothesis                                                 │
-│    - Minimal verification test                                              │
-│  Phase 4: Implement Fix                                                     │
-│    - Write failing test first                                               │
-│    - Fix and verify                                                         │
+│                           Maker Workflow                                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Phase 1: Initialization                                                    │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ - Load .planning/STATE.md                                           │   │
+│  │ - Parse current PLAN.md (execution_mode, wave, tasks)               │   │
+│  │ - Build Wave execution graph (parallel/serial grouping)             │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                     ↓                                       │
+│  Phase 2: Mode Dispatch                                                     │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ Coordinate subagents based on execution_mode:                       │   │
+│  │                                                                     │   │
+│  │ ralph:   @coder -> @tester -> (pass?) -> done / @debugger -> loop   │   │
+│  │ tdd:     RED(@tester) -> GREEN(@coder) -> REFACTOR(@reviewer)       │   │
+│  │ standard: @coder -> @reviewer -> done                               │   │
+│  │ spike:   @researcher -> @coder -> done                              │   │
+│  │ debug:   @debugger -> @tester -> done                               │   │
+│  │ refactor: @reviewer -> @coder -> @tester -> done                    │   │
+│  │ migrate: @coder -> @tester -> done                                  │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                     ↓                                       │
+│  Phase 3: Task Execution                                                    │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ For each task:                                                      │   │
+│  │ - Prepare context -> Delegate to subagent -> Two-stage review       │   │
+│  │   Stage 1: Spec Compliance, Stage 2: Code Quality                   │   │
+│  │ - Verify completion -> @committer commit                            │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                     ↓                                       │
+│  Phase 4: State Management                                                  │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ - Update STATE.md (current position, progress, metrics)             │   │
+│  │ - Update ROADMAP.md (phase completion status)                       │   │
+│  │ - Update REQUIREMENTS.md (mark requirements complete)               │   │
+│  │ - Archive completed PLAN.md to archive/                             │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                     ↓                                       │
+│  Phase 5: Verification                                                      │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ - Run all tests (unit/integration/e2e)                              │   │
+│  │ - Check quality gates (lint/typecheck/build)                        │   │
+│  │ - Verify acceptance criteria                                        │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**铁律**：没有根因调查就没有修复。
+### Debugger 工作流
+
+当遇到 bug、测试失败或意外行为时，使用 @debugger 进行系统性调试。
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          Debugger Workflow                                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Phase 1: Root Cause Investigation                                          │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ - Read error messages (full stack trace)                            │   │
+│  │ - Reproduce the issue reliably                                      │   │
+│  │ - Check recent changes (git diff, git log)                          │   │
+│  │ - Multi-component systems: collect boundary evidence                │   │
+│  │ - Trace data flow to the source                                     │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                     ↓                                       │
+│  Phase 2: Pattern Analysis                                                  │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ - Find working example code                                         │   │
+│  │ - Compare with reference implementation                             │   │
+│  │ - Identify differences                                              │   │
+│  │ - Understand dependencies                                           │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                     ↓                                       │
+│  Phase 3: Hypothesis & Testing                                              │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ - Form single hypothesis ("I think X is root cause because Y")      │   │
+│  │ - Minimal verification test                                         │   │
+│  │ - Valid -> Phase 4 / Invalid -> new hypothesis                      │   │
+│  │ - 3+ failures -> Question the architecture                          │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                     ↓                                       │
+│  Phase 4: Implementation                                                    │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ - Create failing test case (must have test before fix)              │   │
+│  │ - Implement single fix (address root cause, not symptom)            │   │
+│  │ - Verify fix works                                                  │   │
+│  │ - Check for regressions                                             │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  Iron Rule: NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST                 │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -218,7 +299,7 @@ NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                         Hook Enforcement Layer                              │
+│                         Hook Enforcement Layer                               │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │  Hook 1: architect-first-guard                                              │
@@ -248,12 +329,12 @@ NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST
 
 ```yaml
 ## 当前位置
-阶段：[phase-id]           # 必填
-计划：[plan-id]            # 必填
-状态：ready                 # 必填：ready 才能执行
+阶段: [phase-id]           # 必填
+计划: [plan-id]            # 必填
+状态: ready                 # 必填: ready 才能执行
 
 ## 执行模式（必填）
-execution_mode: tdd        # 必填：tdd | ralph | standard | debug | refactor | migrate
+execution_mode: tdd        # 必填: tdd | ralph | standard | debug | refactor | migrate
 ```
 
 ---
@@ -310,7 +391,8 @@ opencode-config/
 ├── skills/
 │   └── ralph-loop/        # Ralph Loop 技能
 ├── plugin/
-│   └── guard.ts           # Hook 强制约束插件
+│   ├── guard.ts           # Hook 强制约束插件
+│   └── ralph.ts           # Ralph Loop 插件
 └── scripts/
     └── task-logger.ts     # 任务日志记录脚本
 ```
@@ -329,6 +411,12 @@ opencode-config/
 
 **价值**：通过只读约束保证审查的公正性，通过单一职责降低错误率。
 
-### 自引用迭代
+### Agent-Skill 依赖原则
 
-让 AI 看到自己的历史工作，形成自我改进的反馈循环。适用于需要多次迭代的复杂任务。
+```
+Agent 可以依赖 Skill，但 Skill 不能依赖 Agent
+```
+
+- **Skill 是被动资源**：提供方法论和模板，被 Agent 加载使用
+- **Agent 是主动执行者**：调用 Skill 获取能力，但不被 Skill 定义
+- **单向依赖保证解耦**：Skill 可独立演化，不破坏 Agent 结构

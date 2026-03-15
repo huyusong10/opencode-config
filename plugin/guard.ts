@@ -1,7 +1,6 @@
 import type { Plugin, Hooks, PluginInput } from "@opencode-ai/plugin"
-import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "fs"
+import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync } from "fs"
 import { basename, dirname, isAbsolute, join, normalize, relative, resolve } from "path"
-import { execSync } from "child_process"
 
 /**
  * Guard Plugin for OpenCode
@@ -32,6 +31,62 @@ type GuardArgs = {
   overwrite?: boolean | string
   content?: string
   newString?: string
+  pattern?: string
+  command?: string
+  args?: string[]
+  todos?: unknown
+}
+
+// ============================================================================
+// Decision Types (for automatic inference)
+// ============================================================================
+
+type DecisionType =
+  | "create_test_file"
+  | "create_source_file"
+  | "create_config_file"
+  | "create_documentation"
+  | "modify_source_file"
+  | "modify_test_file"
+  | "modify_config_file"
+  | "read_file"
+  | "search_code"
+  | "run_tests"
+  | "run_linter"
+  | "run_build"
+  | "run_command"
+  | "git_operation"
+  | "create_todo"
+  | "update_todo"
+  | "spawn_agent"
+  | "other"
+
+type DecisionReason =
+  | "tdd_write_test_first"
+  | "tdd_implement_after_test"
+  | "tdd_refactor"
+  | "fix_failing_test"
+  | "implement_feature"
+  | "fix_bug"
+  | "add_configuration"
+  | "update_documentation"
+  | "explore_codebase"
+  | "understand_context"
+  | "verify_implementation"
+  | "run_quality_check"
+  | "commit_changes"
+  | "track_progress"
+  | "delegate_task"
+  | "unknown"
+
+interface DecisionContext {
+  decision_type: DecisionType
+  decision_reason: DecisionReason
+  inference: string
+  confidence: "high" | "medium" | "low"
+  related_hook_event?: string
+  task_context?: string
+  file_purpose?: string
 }
 
 interface ReadPermissionTracker {
@@ -228,10 +283,32 @@ const TEST_FILE_PATTERNS: RegExp[] = [
 ]
 
 // ============================================================================
-// Task Logger Integration
+// Task Logger Integration (Enhanced)
 // ============================================================================
 
-const LOGGER_SCRIPT = join(process.cwd(), "scripts", "task-logger.ts")
+interface ViolationDetail {
+  rule_id: string
+  expected: string
+  actual: string
+  expected_path?: string
+  actual_path?: string | null
+}
+
+interface ToolContext {
+  tool: string
+  operation: "create" | "modify" | "read" | "delete"
+  target_file: string
+  file_exists: boolean
+  test_file_exists: boolean
+  is_source_file: boolean
+}
+
+interface StateContext {
+  execution_mode?: string
+  current_status?: string
+  plan_tasks_total?: number
+  plan_tasks_completed?: number
+}
 
 interface LogEvent {
   type: "hook_block" | "hook_pass"
@@ -242,34 +319,51 @@ interface LogEvent {
   task?: string
   message: string
   file?: string
+  // Enhanced fields
+  rule?: string
+  violation?: ViolationDetail
+  tool_context?: ToolContext
+  state_context?: StateContext
 }
 
-function logHookEvent(event: LogEvent): void {
-  try {
-    // Only log if logger script exists
-    if (!existsSync(LOGGER_SCRIPT)) return
+// ============================================================================
+// Decision Logging Types
+// ============================================================================
 
-    const args = [
-      "npx", "tsx", LOGGER_SCRIPT, "hook",
-      "--session", event.session,
-      "--hook", event.hook,
-      "--status", event.type === "hook_block" ? "blocked" : "pass",
-      "--message", `"${event.message}"`,
-    ]
-
-    if (event.phase) args.push("--phase", event.phase)
-    if (event.plan) args.push("--plan", event.plan)
-    if (event.task) args.push("--task", `"${event.task}"`)
-    if (event.file) args.push("--files", event.file)
-
-    execSync(args.join(" "), {
-      timeout: 5000,
-      stdio: "pipe",
-      cwd: process.cwd(),
-    })
-  } catch {
-    // Silently fail - logging should not break the hook
+interface DecisionLogEvent {
+  type: "decision"
+  session: string
+  phase?: string
+  plan?: string
+  task?: string
+  decision: DecisionContext
+  tool_invocation: {
+    tool: string
+    target?: string
+    operation?: string
+    success: boolean
+    duration_ms?: number
   }
+  context_snapshot: {
+    recent_hook_blocks: Array<{ hook: string; rule: string; ts: string }>
+    files_in_scope: string[]
+    execution_mode?: string
+  }
+}
+
+// Track recent hook blocks per session for decision context
+const recentHookBlocks = new Map<string, Array<{ hook: string; rule: string; ts: string }>>()
+
+function recordHookBlock(session: string, hook: string, rule: string): void {
+  const blocks = recentHookBlocks.get(session) || []
+  blocks.unshift({ hook, rule, ts: new Date().toISOString() })
+  // Keep only last 10 blocks
+  if (blocks.length > 10) blocks.pop()
+  recentHookBlocks.set(session, blocks)
+}
+
+function getRecentHookBlocks(session: string): Array<{ hook: string; rule: string; ts: string }> {
+  return recentHookBlocks.get(session) || []
 }
 
 function logToFile(ctx: PluginInput, event: LogEvent): void {
@@ -288,13 +382,275 @@ function logToFile(ctx: PluginInput, event: LogEvent): void {
       type: event.type,
       session: event.session,
       hook: event.hook,
+      rule: event.rule,
       phase: event.phase,
       plan: event.plan,
       task: event.task,
+      violation: event.violation,
+      tool_context: event.tool_context,
+      state_context: event.state_context,
       data: {
         message: event.message,
         file: event.file,
       },
+    }
+
+    appendFileSync(logFile, JSON.stringify(entry) + "\n", "utf-8")
+
+    // Record hook block for decision context
+    if (event.type === "hook_block" && event.rule) {
+      recordHookBlock(event.session, event.hook, event.rule)
+    }
+  } catch {
+    // Silently fail
+  }
+}
+
+function buildToolContext(
+  tool: string,
+  operation: "create" | "modify" | "read" | "delete",
+  targetFile: string
+): ToolContext {
+  const fileExists = existsSync(targetFile)
+  const isSource = isSourceFilePath(targetFile)
+  const expectedTest = isSource ? inferTestFile(targetFile) : null
+  const testExists = expectedTest ? existsSync(expectedTest) : false
+
+  return {
+    tool,
+    operation,
+    target_file: targetFile,
+    file_exists: fileExists,
+    test_file_exists: testExists,
+    is_source_file: isSource,
+  }
+}
+
+function buildStateContext(ctx: PluginInput): StateContext {
+  const statePath = join(ctx.directory, ".planning", "STATE.md")
+  const state = parseStateFile(statePath)
+
+  if (!state) {
+    return {}
+  }
+
+  const context: StateContext = {
+    execution_mode: state.execution_mode,
+    current_status: state.status,
+  }
+
+  // Count tasks from plan if available
+  if (state.maker?.current_phase && state.maker?.current_plan) {
+    const planPath = join(
+      ctx.directory,
+      ".planning",
+      "phases",
+      state.maker.current_phase,
+      `${state.maker.current_plan}-PLAN.md`
+    )
+    if (existsSync(planPath)) {
+      const planResult = parsePlanFile(planPath)
+      if (planResult) {
+        context.plan_tasks_total = planResult.tasks.length
+        context.plan_tasks_completed = planResult.tasks.filter(t => t.completed).length
+      }
+    }
+  }
+
+  return context
+}
+
+// ============================================================================
+// Decision Inference Engine
+// ============================================================================
+
+function inferDecision(
+  tool: string,
+  args: GuardArgs | undefined,
+  session: string,
+  stateContext: StateContext
+): DecisionContext {
+  const targetPath = getPathFromArgs(args)
+  const recentBlocks = getRecentHookBlocks(session)
+
+  // Determine decision type
+  let decisionType: DecisionType = "other"
+  let decisionReason: DecisionReason = "unknown"
+  let inference = ""
+  let confidence: "high" | "medium" | "low" = "medium"
+  let filePurpose = ""
+
+  if (tool === "write" || tool === "edit") {
+    if (targetPath) {
+      const isTest = isTestFilePath(targetPath)
+      const isSource = isSourceFilePath(targetPath)
+      const isConfig = /\.(json|yaml|yml|toml|ini|env)$/.test(targetPath)
+      const isDoc = /\.md$/.test(targetPath)
+      const fileExists = existsSync(targetPath)
+
+      if (isTest) {
+        decisionType = fileExists ? "modify_test_file" : "create_test_file"
+        filePurpose = "test file"
+      } else if (isSource) {
+        decisionType = fileExists ? "modify_source_file" : "create_source_file"
+        filePurpose = "source file"
+      } else if (isConfig) {
+        decisionType = fileExists ? "modify_config_file" : "create_config_file"
+        filePurpose = "configuration file"
+      } else if (isDoc) {
+        decisionType = "create_documentation"
+        filePurpose = "documentation"
+      }
+
+      // Infer reason based on context
+      const lastBlock = recentBlocks[0]
+
+      if (stateContext.execution_mode === "tdd") {
+        if (isTest && !fileExists) {
+          decisionReason = "tdd_write_test_first"
+          inference = `Create test file following TDD workflow (test-first for ${getFeatureName(targetPath)})`
+          confidence = "high"
+        } else if (isSource && !fileExists) {
+          // Check if test was recently created
+          const testExistsForSource = checkTestExistsForSource(targetPath)
+          if (testExistsForSource) {
+            decisionReason = "tdd_implement_after_test"
+            inference = `Implement source code after test exists (TDD workflow for ${getFeatureName(targetPath)})`
+            confidence = "high"
+          } else {
+            decisionReason = "implement_feature"
+            inference = `Create new source file for ${getFeatureName(targetPath)}`
+            confidence = "medium"
+          }
+        } else if (isSource && fileExists) {
+          decisionReason = "tdd_refactor"
+          inference = `Modify existing source file (likely refactoring or extending ${getFeatureName(targetPath)})`
+          confidence = "medium"
+        }
+      } else if (lastBlock?.hook === "test-first-guard") {
+        // Previous block was TDD violation, now creating test
+        if (isTest) {
+          decisionReason = "tdd_write_test_first"
+          inference = `Create test file after TDD violation (complying with guard rule)`
+          confidence = "high"
+        }
+      } else if (lastBlock?.rule?.startsWith("ARCH")) {
+        decisionReason = "implement_feature"
+        inference = `Implementation following architect planning`
+        confidence = "medium"
+      }
+
+      // Default inference if not set
+      if (!inference) {
+        if (fileExists) {
+          decisionReason = "implement_feature"
+          inference = `Modify ${filePurpose}: ${basename(targetPath)}`
+        } else {
+          decisionReason = "implement_feature"
+          inference = `Create ${filePurpose}: ${basename(targetPath)}`
+        }
+      }
+    }
+  } else if (tool === "read") {
+    decisionType = "read_file"
+    if (targetPath) {
+      decisionReason = "understand_context"
+      inference = `Read file to understand context: ${basename(targetPath)}`
+      confidence = "medium"
+    }
+  } else if (tool === "grep" || tool === "glob") {
+    decisionType = "search_code"
+    decisionReason = "explore_codebase"
+    const pattern = args?.pattern || ""
+    inference = `Search codebase for: ${pattern}`
+    confidence = "high"
+  } else if (tool === "bash") {
+    const command = args?.command || ""
+    if (command.includes("test") || command.includes("spec")) {
+      decisionType = "run_tests"
+      decisionReason = "verify_implementation"
+      inference = "Run tests to verify implementation"
+      confidence = "high"
+    } else if (command.includes("lint") || command.includes("eslint") || command.includes("ruff")) {
+      decisionType = "run_linter"
+      decisionReason = "run_quality_check"
+      inference = "Run linter for code quality check"
+      confidence = "high"
+    } else if (command.includes("build") || command.includes("compile")) {
+      decisionType = "run_build"
+      decisionReason = "verify_implementation"
+      inference = "Build project to verify compilation"
+      confidence = "high"
+    } else if (command.startsWith("git ")) {
+      decisionType = "git_operation"
+      if (command.includes("commit")) {
+        decisionReason = "commit_changes"
+        inference = "Commit changes to version control"
+      } else {
+        decisionReason = "explore_codebase"
+        inference = `Git operation: ${command.split(" ")[1] || "unknown"}`
+      }
+      confidence = "high"
+    } else {
+      decisionType = "run_command"
+      decisionReason = "unknown"
+      inference = `Execute command: ${command.slice(0, 50)}`
+      confidence = "low"
+    }
+  } else if (tool === "todowrite") {
+    decisionType = "update_todo"
+    decisionReason = "track_progress"
+    inference = "Update task progress tracking"
+    confidence = "high"
+  } else if (tool === "task") {
+    decisionType = "spawn_agent"
+    decisionReason = "delegate_task"
+    inference = "Spawn subagent for specialized task"
+    confidence = "high"
+  }
+
+  return {
+    decision_type: decisionType,
+    decision_reason: decisionReason,
+    inference,
+    confidence,
+    related_hook_event: recentBlocks[0]?.hook,
+    file_purpose: filePurpose || undefined,
+  }
+}
+
+function checkTestExistsForSource(sourcePath: string): boolean {
+  const testPath = inferTestFile(sourcePath)
+  return existsSync(testPath)
+}
+
+function getFeatureName(filePath: string): string {
+  const base = basename(filePath)
+  const name = base.replace(/\.(test|spec)\.(ts|tsx|js|jsx|py)$/, "").replace(/\.(ts|tsx|js|jsx|py|go|rs)$/, "")
+  return name || "feature"
+}
+
+function logDecision(ctx: PluginInput, event: DecisionLogEvent): void {
+  try {
+    const logsDir = join(ctx.directory, ".planning", ".logs")
+    const dailyDir = join(logsDir, "daily")
+    const date = new Date().toISOString().split("T")[0]
+    const logFile = join(dailyDir, `${date}.jsonl`)
+
+    if (!existsSync(dailyDir)) {
+      mkdirSync(dailyDir, { recursive: true })
+    }
+
+    const entry = {
+      ts: new Date().toISOString(),
+      type: "decision",
+      session: event.session,
+      phase: event.phase,
+      plan: event.plan,
+      task: event.task,
+      decision: event.decision,
+      tool_invocation: event.tool_invocation,
+      context_snapshot: event.context_snapshot,
     }
 
     appendFileSync(logFile, JSON.stringify(entry) + "\n", "utf-8")
@@ -765,6 +1121,11 @@ function createArchitectFirstGuardHook(ctx: PluginInput): Hooks {
       if (!isSourceFilePath(resolvedPath)) return
 
       const sessionId = input.sessionID || "unknown"
+      const toolContext = buildToolContext(
+        toolName,
+        existsSync(resolvedPath) ? "modify" : "create",
+        resolvedPath
+      )
 
       // Check STATE.md existence
       const statePath = join(ctx.directory, ".planning", "STATE.md")
@@ -773,8 +1134,16 @@ function createArchitectFirstGuardHook(ctx: PluginInput): Hooks {
           type: "hook_block",
           session: sessionId,
           hook: "architect-first-guard",
+          rule: "ARCH-001: state-file-required",
           message: "STATE.md not found",
           file: resolvedPath,
+          violation: {
+            rule_id: "ARCH-001",
+            expected: "STATE.md file exists in .planning/",
+            actual: "STATE.md not found",
+          },
+          tool_context: toolContext,
+          state_context: buildStateContext(ctx),
         })
         throw new Error(ARCHITECT_REQUIRED_MESSAGE)
       }
@@ -786,8 +1155,16 @@ function createArchitectFirstGuardHook(ctx: PluginInput): Hooks {
           type: "hook_block",
           session: sessionId,
           hook: "architect-first-guard",
+          rule: "ARCH-002: state-parse-valid",
           message: "STATE.md parse failed",
           file: resolvedPath,
+          violation: {
+            rule_id: "ARCH-002",
+            expected: "Valid STATE.md content",
+            actual: "Failed to parse STATE.md",
+          },
+          tool_context: toolContext,
+          state_context: buildStateContext(ctx),
         })
         throw new Error(ARCHITECT_REQUIRED_MESSAGE)
       }
@@ -798,10 +1175,18 @@ function createArchitectFirstGuardHook(ctx: PluginInput): Hooks {
           type: "hook_block",
           session: sessionId,
           hook: "architect-first-guard",
+          rule: "ARCH-003: status-ready-required",
           phase: state.maker?.current_phase,
           plan: state.maker?.current_plan,
           message: `Status not ready: ${state.status}`,
           file: resolvedPath,
+          violation: {
+            rule_id: "ARCH-003",
+            expected: "status: ready or executing",
+            actual: `status: ${state.status}`,
+          },
+          tool_context: toolContext,
+          state_context: buildStateContext(ctx),
         })
         throw new Error(ARCHITECT_NOT_COMPLETE_MESSAGE(state.status))
       }
@@ -812,10 +1197,18 @@ function createArchitectFirstGuardHook(ctx: PluginInput): Hooks {
           type: "hook_block",
           session: sessionId,
           hook: "execution-mode-guard",
+          rule: "EXEC-001: mode-specified",
           phase: state.maker?.current_phase,
           plan: state.maker?.current_plan,
           message: "execution_mode not specified",
           file: resolvedPath,
+          violation: {
+            rule_id: "EXEC-001",
+            expected: "execution_mode specified in STATE.md",
+            actual: "execution_mode not found",
+          },
+          tool_context: toolContext,
+          state_context: buildStateContext(ctx),
         })
         throw new Error(EXECUTION_MODE_MISSING_MESSAGE)
       }
@@ -846,28 +1239,56 @@ function enforceTDDGuard(ctx: PluginInput, filePath: string, sessionId: string, 
 
   // For new files, require test to exist first
   if (!existsSync(filePath) && !existsSync(expectedTestFile)) {
+    const toolContext = buildToolContext("write", "create", filePath)
     logToFile(ctx, {
       type: "hook_block",
       session: sessionId,
       hook: "test-first-guard",
+      rule: "TDD-001: test-first",
       phase: state.maker?.current_phase,
       plan: state.maker?.current_plan,
       message: `TDD violation: test file not found`,
       file: filePath,
+      violation: {
+        rule_id: "TDD-001",
+        expected: "Test file exists before source file creation",
+        actual: "Test file not found",
+        expected_path: expectedTestFile,
+        actual_path: null,
+      },
+      tool_context: toolContext,
+      state_context: {
+        execution_mode: state.execution_mode,
+        current_status: state.status,
+      },
     })
     throw new Error(TDD_TEST_FIRST_MESSAGE(filePath, expectedTestFile))
   }
 
   // For existing files being edited, check if test exists
   if (existsSync(filePath) && !existsSync(expectedTestFile)) {
+    const toolContext = buildToolContext("edit", "modify", filePath)
     logToFile(ctx, {
       type: "hook_block",
       session: sessionId,
       hook: "test-first-guard",
+      rule: "TDD-002: test-required-for-edit",
       phase: state.maker?.current_phase,
       plan: state.maker?.current_plan,
       message: `TDD violation: editing file without test`,
       file: filePath,
+      violation: {
+        rule_id: "TDD-002",
+        expected: "Test file exists for source file being edited",
+        actual: "Test file not found",
+        expected_path: expectedTestFile,
+        actual_path: null,
+      },
+      tool_context: toolContext,
+      state_context: {
+        execution_mode: state.execution_mode,
+        current_status: state.status,
+      },
     })
     throw new Error(TDD_TEST_FIRST_MESSAGE(filePath, expectedTestFile))
   }
@@ -922,13 +1343,29 @@ function createPlanCompletionGuardHook(ctx: PluginInput): Hooks {
       const incompleteTasks = extractIncompleteTasks(planContent)
 
       if (incompleteTasks.length > 0) {
+        const toolContext = buildToolContext(toolName, "modify", resolvedPath)
+        const planResult = parsePlanFile(planPath)
         logToFile(ctx, {
           type: "hook_block",
           session: sessionId,
           hook: "plan-completion-guard",
+          rule: "PLAN-001: all-tasks-complete",
           phase: state.maker.current_phase,
           plan: state.maker.current_plan,
           message: `Incomplete tasks: ${incompleteTasks.join(", ")}`,
+          file: resolvedPath,
+          violation: {
+            rule_id: "PLAN-001",
+            expected: "All tasks in plan marked complete",
+            actual: `${incompleteTasks.length} tasks incomplete: ${incompleteTasks.slice(0, 3).join(", ")}${incompleteTasks.length > 3 ? "..." : ""}`,
+          },
+          tool_context: toolContext,
+          state_context: {
+            execution_mode: state.execution_mode,
+            current_status: state.status,
+            plan_tasks_total: planResult?.tasks.length,
+            plan_tasks_completed: planResult?.tasks.filter(t => t.completed).length,
+          },
         })
         throw new Error(PLAN_INCOMPLETE_MESSAGE(incompleteTasks))
       }
@@ -1001,6 +1438,110 @@ function extractIncompleteTodos(output: string): string[] {
 }
 
 // ============================================================================
+// Hook 6: Decision Logger (tool.execute.after)
+// ============================================================================
+
+function createDecisionLoggerHook(ctx: PluginInput): Hooks {
+  return {
+    "tool.execute.after": async (input, output) => {
+      const toolName = input.tool?.toLowerCase()
+      if (!toolName) return
+
+      const sessionId = input.sessionID || "unknown"
+      const argsRecord = asRecord(output.args)
+      const args = argsRecord as GuardArgs | undefined
+
+      // Get state context
+      const stateContext = buildStateContext(ctx)
+
+      // Infer decision
+      const decision = inferDecision(toolName, args, sessionId, stateContext)
+
+      // Build tool invocation record
+      const targetPath = getPathFromArgs(args)
+      const startTime = output.startTime ? new Date(output.startTime).getTime() : Date.now()
+      const endTime = Date.now()
+      const duration = endTime - startTime
+
+      const toolInvocation = {
+        tool: toolName,
+        target: targetPath,
+        operation: getOperationType(toolName, targetPath),
+        success: !output.error,
+        duration_ms: duration,
+      }
+
+      // Build context snapshot
+      const contextSnapshot = {
+        recent_hook_blocks: getRecentHookBlocks(sessionId).slice(0, 3),
+        files_in_scope: getFilesInScope(ctx),
+        execution_mode: stateContext.execution_mode,
+      }
+
+      // Log decision
+      logDecision(ctx, {
+        type: "decision",
+        session: sessionId,
+        phase: stateContext.current_status,
+        plan: undefined,
+        task: undefined,
+        decision,
+        tool_invocation: toolInvocation,
+        context_snapshot: contextSnapshot,
+      })
+    },
+    event: async ({ event }) => {
+      if (event.type === "session.deleted") {
+        const props = event.properties as { info?: { id?: string } } | undefined
+        const sessionID = props?.info?.id
+        if (sessionID) {
+          recentHookBlocks.delete(sessionID)
+        }
+      }
+    },
+  }
+}
+
+function getOperationType(tool: string, targetPath?: string): string {
+  if (tool === "read") return "read"
+  if (tool === "write") return targetPath && existsSync(targetPath) ? "modify" : "create"
+  if (tool === "edit") return "modify"
+  if (tool === "bash") return "execute"
+  if (tool === "grep" || tool === "glob") return "search"
+  return "unknown"
+}
+
+function getFilesInScope(ctx: PluginInput): string[] {
+  const files: string[] = []
+  try {
+    const statePath = join(ctx.directory, ".planning", "STATE.md")
+    if (existsSync(statePath)) {
+      const state = parseStateFile(statePath)
+      if (state?.maker?.current_phase && state?.maker?.current_plan) {
+        const planPath = join(
+          ctx.directory,
+          ".planning",
+          "phases",
+          state.maker.current_phase,
+          `${state.maker.current_plan}-PLAN.md`
+        )
+        if (existsSync(planPath)) {
+          const planResult = parsePlanFile(planPath)
+          if (planResult) {
+            for (const task of planResult.tasks) {
+              if (task.file) files.push(task.file)
+            }
+          }
+        }
+      }
+    }
+  } catch {
+    // Ignore errors
+  }
+  return files
+}
+
+// ============================================================================
 // Plugin Export
 // ============================================================================
 
@@ -1017,6 +1558,9 @@ export const GuardPlugin: Plugin = async (ctx) => {
 
     // Continuity
     ...createTodoContinuationEnforcerHook(),
+
+    // Decision logging
+    ...createDecisionLoggerHook(ctx),
   }
 }
 
