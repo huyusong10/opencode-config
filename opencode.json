@@ -271,7 +271,7 @@
       "enabled": false
     }
   },
-  "model": "alibaba-coding-plan/qwen3.5-plus",
+  "model": "alibaba-coding-plan/glm-5",
   "small_model": "alibaba-coding-plan/qwen3.5-plus",
   "permission": {
     "external_directory": {
