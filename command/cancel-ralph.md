@@ -58,7 +58,7 @@ else
     echo "未找到活动的 Ralph Loop。"
     echo ""
     echo "如需启动新的 Ralph Loop，请使用："
-    echo "  /ralph-loop 或 @ralph-planner"
+    echo "  /ralph-loop 或 @architect"
 fi
 ```
 

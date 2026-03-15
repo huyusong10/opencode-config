@@ -15,7 +15,8 @@ while 任务未完成:
     AI 接收相同的提示词
     AI 看到之前的工作
     AI 继续推进任务
-    直到客观条件满足
+    Plugin 检查 <promise> 标签
+    直到检测到完成承诺
 ```
 
 ### 解决的问题
@@ -53,32 +54,36 @@ while 任务未完成:
 
 | Agent | 描述 |
 |-------|------|
-| `@ralph-planner` | 规划代理：需求探索、场景设计、创建规划文件 |
-| `@ralph-executor` | 执行代理：持续迭代执行任务直到完成 |
+| `@architect` | 规划代理：需求探索、推荐执行模式、创建规划文件 |
+| `@maker` | 执行代理：以 ralph 模式协调 @coder, @tester, @debugger 循环 |
 
 ## 使用流程
 
 ```
 1. 启动规划
-   /ralph-loop 或 @ralph-planner
+   /ralph-loop 或 @architect
 
 2. 完成规划
    - 明确需求
-   - 设计场景
+   - 推荐执行模式（默认 ralph）
    - 定义完成承诺
    - 确认启动
 
 3. 执行任务
-   @ralph-executor 或 /ralph-start
+   @maker 或 /ralph-start
 
-4. 查看进度
+4. 自动循环
+   plugin/ralph.ts 拦截 session.idle
+   检查 <promise> 标签
+   未完成则继续
+
+5. 查看进度
    cat .ralph/PROGRESS.md
-
-5. 查看学习
-   cat .ralph/LEARNING.md
 ```
 
 ## 文件结构
+
+### Ralph Loop 专用
 
 ```
 .ralph/
@@ -87,6 +92,17 @@ while 任务未完成:
 ├── PROGRESS.md         # 进度记录
 ├── LEARNING.md         # 学习笔记
 └── ralph-config.json   # 配置（完成承诺、迭代限制）
+```
+
+### 标准规划
+
+```
+.planning/
+├── PROJECT.md          # 项目愿景
+├── REQUIREMENTS.md     # 需求列表
+├── ROADMAP.md          # 路线图
+├── STATE.md            # 状态
+└── phases/             # 阶段计划
 ```
 
 ## 核心概念
@@ -102,18 +118,18 @@ while 任务未完成:
 - "所有测试通过，覆盖率 >= 80%"
 - "pytest tests/ 通过，无失败用例"
 
-### Context Rot vs In-Context Learning
+### Stop Hook 机制
 
-| 现象 | 特征 | 影响 |
-|------|------|------|
-| Context Rot | 重复错误、冗余输出 | 性能下降 |
-| In-Context Learning | 错误反馈、成功记录 | 越跑越聪明 |
-
-判断标准：删除历史记录后，问题是更容易还是更难解决？
+plugin/ralph.ts 实现：
+1. 拦截 `session.idle` 事件
+2. 提取最后一条 assistant 消息
+3. 检查 `<promise>` 标签
+4. 未检测到 → 重新注入提示词
 
 ## 学习更多
 
 - 技能文档：`skills/ralph-loop/SKILL.md`
-- 规划代理：`agent/ralph-planner.md`
-- 执行代理：`agent/ralph-executor.md`
+- 规划代理：`agent/architect.md`
+- 执行代理：`agent/maker.md`
+- 插件实现：`plugin/ralph.ts`
 - 原始技术：https://ghuntley.com/ralph/
