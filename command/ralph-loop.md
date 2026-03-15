@@ -8,6 +8,22 @@ description: 启动 Ralph Loop 规划流程
 
 ## 使用方式
 
+### 显式调用 Architect（需求设计模式）
+
+```
+@architect
+```
+
+**强制流程：**
+1. 读取 `.planning` 目录（如果存在）
+2. 需求探索对话
+3. 输出 `.planning` 目录结构
+4. Ralph Loop 持续完善计划（如计划不完善）
+
+**无退出例外。** 用户需求不明确时，指出并等待，不要退出。
+
+---
+
 ### 方式 1：完整规划流程（推荐）
 
 调用 architect agent：
