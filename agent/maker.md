@@ -72,8 +72,66 @@ find .planning/phases -name "*-PLAN.md" -exec grep -L "complete: true" {} \;
 
 读取 PLAN.md:
 - 从 frontmatter 提取 `execution_mode`
+- 从 frontmatter 提取 `wave` 编号
+- 从 frontmatter 提取 `depends_on` 依赖
 - 识别任务和依赖关系
 - 理解验收标准
+
+#### 1.4 构建 Wave 执行图
+
+**如果有多个计划，构建 Wave 执行图：**
+
+```bash
+# 读取 Wave 结构
+cat .planning/phases/*/WAVE-STRUCTURE.md 2>/dev/null
+
+# 列出所有未完成计划
+find .planning/phases -name "*-PLAN.md" -exec grep -L "complete: true" {} \;
+```
+
+**Wave 分组逻辑：**
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│  WAVE EXECUTION                                                     │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  WAVE 1 (parallel)          WAVE 2 (parallel)          WAVE 3      │
+│  ┌─────────┐ ┌─────────┐    ┌─────────┐ ┌─────────┐    ┌─────────┐ │
+│  │ Plan 01 │ │ Plan 02 │ →  │ Plan 03 │ │ Plan 04 │ →  │ Plan 05 │ │
+│  │         │ │         │    │         │ │         │    │         │ │
+│  │ User    │ │ Product │    │ Orders  │ │ Cart    │    │ Checkout│ │
+│  │ Feature │ │ Feature │    │ API     │ │ API     │    │ UI      │ │
+│  └─────────┘ └─────────┘    └─────────┘ └─────────┘    └─────────┘ │
+│       │           │              ↑           ↑              ↑      │
+│       └───────────┴──────────────┴───────────┘              │      │
+│              同 Wave 内并行       Wave 间串行                │      │
+│                                                                    │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+**执行规则：**
+- 同 Wave 内的计划可并行执行（无文件冲突）
+- Wave N+1 必须等待 Wave N 完成
+- 有 `depends_on` 的计划必须等待依赖完成
+
+**分组输出：**
+
+```markdown
+## Wave 执行计划
+
+| Wave | Plans | 并行 | 阻塞因素 |
+|------|-------|------|----------|
+| 1 | 01-user, 02-product | ✅ | 无 |
+| 2 | 03-orders, 04-cart | ✅ | 依赖 Wave 1 |
+| 3 | 05-checkout | No | 有 checkpoint |
+
+### 当前执行状态
+
+- 当前 Wave: [N]
+- Wave 内完成: [X]/[Y]
+- 待执行: [plans list]
+```
 
 ---
 
@@ -167,6 +225,116 @@ REFACTOR → @reviewer + @coder
 
 ---
 
+### 阶段 2.5: Wave Execution (多计划执行)
+
+**当阶段有多个计划时，按 Wave 分组执行：**
+
+#### Wave 执行流程
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                     WAVE EXECUTION FLOW                             │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │ FOR each wave IN wave_order:                                │   │
+│  │                                                             │   │
+│  │   plans_in_wave = get_plans_by_wave(wave)                  │   │
+│  │                                                             │   │
+│  │   IF len(plans_in_wave) > 1 AND no_file_conflicts:         │   │
+│  │     → PARALLEL EXECUTION                                    │   │
+│  │     ┌───────────────────────────────────────────────────┐  │   │
+│  │     │ FOR each plan IN plans_in_wave (concurrent):      │  │   │
+│  │     │   dispatch_subagent(plan)                         │  │   │
+│  │     │   wait_for_completion()                            │  │   │
+│  │     └───────────────────────────────────────────────────┘  │   │
+│  │   ELSE:                                                     │   │
+│  │     → SEQUENTIAL EXECUTION                                  │   │
+│  │     FOR each plan IN plans_in_wave:                        │   │
+│  │       execute_plan(plan)                                    │   │
+│  │                                                             │   │
+│  │   WAIT: all plans in wave complete                         │   │
+│  │   VERIFY: wave success criteria                             │   │
+│  │   UPDATE: STATE.md                                          │   │
+│  │                                                             │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+#### 并行执行条件
+
+**可以并行的条件：**
+1. 同 Wave 编号
+2. 无文件冲突 (`files_modified` 不重叠)
+3. 无 `depends_on` 依赖同一 Wave 内的其他计划
+4. 所有计划 `autonomous: true`
+
+**必须串行的情况：**
+- 文件冲突
+- 同 Wave 内存在依赖
+- 有 `checkpoint` 的计划
+
+#### 并行执行实现
+
+**使用 @task 工具启动并行 subagent：**
+
+```markdown
+# Wave N 并行执行
+
+@task (subagent: coder, parallel: true)
+
+## Plan: 01-user-feature
+[计划内容]
+
+---
+
+@task (subagent: coder, parallel: true)
+
+## Plan: 02-product-feature
+[计划内容]
+```
+
+#### Wave 完成验证
+
+每个 Wave 完成后：
+
+```bash
+# 验证 Wave 内所有计划的产出
+for plan in wave_plans:
+  verify_plan_outputs(plan)
+
+# 检查 must_haves
+check_must_haves(phase, wave)
+
+# 更新 STATE.md
+update_wave_progress(wave, completed_plans)
+```
+
+#### Wave 执行输出
+
+```markdown
+## Wave N 执行完成
+
+**并行计划:** [plan_ids]
+**串行计划:** [plan_ids]
+**总耗时:** [time]
+
+### 完成状态
+
+| Plan | Status | Commits | Summary |
+|------|--------|---------|---------|
+| 01-user | ✅ | abc123, def456 | User model + API |
+| 02-product | ✅ | ghi789 | Product model |
+
+### 下一步
+
+- 继续 Wave [N+1]，或
+- 所有 Wave 完成 → 阶段结束
+```
+
+---
+
 ### 阶段 3: 任务执行
 
 对于计划中的每个任务:
@@ -203,7 +371,104 @@ REFACTOR → @reviewer + @coder
 @path/to/relevant/file.ts
 ```
 
-#### 3.3 验证完成
+#### 3.3 两阶段审查
+
+**执行 @coder 完成后，必须执行两阶段审查：**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    两阶段审查流程                            │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Stage 1: Spec Compliance (规范符合性)                      │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ @reviewer --stage=spec                              │   │
+│  │                                                     │   │
+│  │ 检查：                                              │   │
+│  │ - 实现了所有计划中的功能？                          │   │
+│  │ - 没有过度实现（计划外功能）？                      │   │
+│  │ - 没有实现不足（遗漏功能）？                        │   │
+│  │ - API/文件结构与计划一致？                          │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                         │                                   │
+│                         ▼                                   │
+│              ┌─────────────────────┐                        │
+│              │ Stage 1 通过?       │                        │
+│              └─────────────────────┘                        │
+│                   │           │                             │
+│               YES │           │ NO                          │
+│                   ▼           ▼                             │
+│     ┌─────────────────┐  ┌──────────────────────┐           │
+│     │ Stage 2         │  │ 返回 @coder          │           │
+│     │ (继续)          │  │ 修复规范问题         │           │
+│     └─────────────────┘  └──────────────────────┘           │
+│                   │                                         │
+│                   ▼                                         │
+│  Stage 2: Code Quality (代码质量)                           │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ @reviewer --stage=quality                           │   │
+│  │                                                     │   │
+│  │ 检查：                                              │   │
+│  │ - 代码风格一致？                                    │   │
+│  │ - 命名清晰？                                        │   │
+│  │ - 错误处理完善？                                    │   │
+│  │ - 安全性检查通过？                                  │   │
+│  │ - 无重复代码？                                      │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                         │                                   │
+│                         ▼                                   │
+│              ┌─────────────────────┐                        │
+│              │ Stage 2 通过?       │                        │
+│              └─────────────────────┘                        │
+│                   │           │                             │
+│               YES │           │ NO                          │
+│                   ▼           ▼                             │
+│     ┌─────────────────┐  ┌──────────────────────┐           │
+│     │ 继续提交        │  │ 返回 @coder          │           │
+│     │                 │  │ 修复质量问题         │           │
+│     └─────────────────┘  └──────────────────────┘           │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**审查调用示例：**
+
+```
+@reviewer
+
+## 审查类型
+Stage 1: Spec Compliance
+
+## Plan Reference
+@.planning/phases/01-foundation/01-01-PLAN.md
+
+## 变更文件
+src/auth/login.ts
+src/types/user.ts
+
+## 验收标准 (来自 Plan)
+- User can login with email/password
+- Invalid credentials return 401
+- Successful login returns JWT token
+```
+
+**Stage 1 通过后：**
+
+```
+@reviewer
+
+## 审查类型
+Stage 2: Code Quality
+
+## 变更文件
+src/auth/login.ts
+src/types/user.ts
+
+## 项目规范
+@AGENTS.md
+```
+
+#### 3.4 验证完成
 
 ```bash
 # 运行验证命令
@@ -213,7 +478,9 @@ REFACTOR → @reviewer + @coder
 echo $?  # 0 = 成功
 ```
 
-#### 3.4 提交
+#### 3.5 提交
+
+**仅在两阶段审查都通过后提交。**
 
 使用 **committer** skill:
 
@@ -230,20 +497,63 @@ echo $?  # 0 = 成功
 
 #### 4.1 更新 STATE.md
 
+**每个计划完成后更新：**
+
 ```markdown
 ## 当前位置
 - 阶段: [X] / [Y]
 - 计划: [A] / [B]
 - 状态: [进行中 / 已完成]
 - 最后活动: [时间戳]
+- 停止于: [phase]-[plan]-PLAN.md
 
 ## 进度
-[████░░░░░░] 40%
+[████░░░░░░] 40% ([X]/[Y] 阶段完成)
+
+---
+
+## 性能指标
+
+| 指标 | 值 |
+|------|-----|
+| 已完成计划 | [N] |
+| 平均计划时长 | [avg] 分钟 |
+| 总任务数 | [total] |
+| 已完成任务 | [completed] |
+| Deviation 数 | [count] |
+
+---
+
+## 决策记录
+
+| 日期 | 阶段 | 决策 | 原因 |
+|------|------|------|------|
+| [date] | [phase] | [决策内容] | [原因] |
+
+---
+
+## 当前阻塞
+
+*(仅在存在阻塞时填充)*
+
+| ID | 描述 | 阻塞类型 | 发现时间 | 状态 |
+|----|------|----------|----------|------|
+| BLK-01 | [描述] | [类型] | [时间] | active |
+
+---
 
 ## 已完成任务
-- [x] 任务 1: [名称]
-- [x] 任务 2: [名称]
+- [x] 任务 1: [名称] (commit: abc123)
+- [x] 任务 2: [名称] (commit: def456)
 ```
+
+**更新时机：**
+- **当前位置** - 每个计划开始/完成时
+- **进度** - 每个阶段完成时
+- **性能指标** - 每个计划完成时
+- **决策记录** - 应用 Rule 4 或做出关键决策时
+- **当前阻塞** - 发现阻塞时添加，解决时标记 `resolved`
+- **已完成任务** - 每个任务提交后
 
 #### 4.2 更新 ROADMAP.md
 
@@ -335,7 +645,352 @@ npm run build
 
 ---
 
-## 错误处理
+## Deviation Rules (偏差处理规则)
+
+执行计划时，**必然会**发现计划中未预见的工作。以下是处理偏差的规则。
+
+### 核心原则
+
+```
+计划是指导，不是枷锁。
+自动修复小问题，询问用户大变更。
+记录所有偏差到 SUMMARY.md。
+```
+
+### 自动修复规则 (规则 1-3) - 无需用户确认
+
+| 规则 | 触发条件 | 示例 | 操作 |
+|------|----------|------|------|
+| **Rule 1** | 代码不按预期工作 | 逻辑错误、类型错误、null pointer、安全漏洞、竞态条件 | 通过 @debugger 自动修复 |
+| **Rule 2** | 缺失关键功能 | 错误处理、输入验证、null 检查、认证缺失、缺少索引 | 通过 @coder 自动添加 |
+| **Rule 3** | 阻塞问题 | 缺少依赖、类型不匹配、import 错误、环境变量缺失、循环依赖 | 自动解决 |
+
+**关键功能定义：** 正确性、安全性、性能所必需的功能。不是"功能需求"，而是"正确性需求"。
+
+#### Rule 1-3 的统一处理流程
+
+```
+1. 发现问题 → 立即修复
+2. 添加/更新测试 (如适用)
+3. 验证修复有效
+4. 继续当前任务
+5. 记录到 SUMMARY.md: [Rule N - 类型] 描述
+```
+
+### 用户升级规则 (规则 4) - 必须询问用户
+
+| 触发条件 | 示例 | 操作 |
+|----------|------|------|
+| 架构级变更 | 新数据库表、大 schema 变更、新服务层、切换框架、改变认证方案 | **STOP** → 返回 checkpoint |
+| 外部依赖 | 需要 API key、第三方服务集成、付费服务 | **STOP** → 返回 checkpoint |
+| 需求不明确 | 多种实现方式、无明确选择 | **STOP** → 返回 checkpoint |
+
+### 规则优先级
+
+```
+1. Rule 4 适用? → STOP (架构决策)
+2. Rule 1-3 适用? → 自动修复
+3. 真的不确定? → Rule 4 (询问)
+```
+
+### 边界情况判断
+
+| 情况 | 适用规则 |
+|------|----------|
+| 缺少验证 | Rule 2 (安全性) |
+| null 导致崩溃 | Rule 1 (bug) |
+| 需要新数据表 | Rule 4 (架构) |
+| 需要新字段 | Rule 1 或 2 (取决于上下文) |
+| 性能问题 | Rule 1 (如果影响功能) 或 Rule 4 (如果需要重新设计) |
+
+**判断口诀：** "这会影响正确性、安全性或任务完成吗？"
+- **是** → Rules 1-3
+- **可能** → Rule 4
+
+### 作用域边界
+
+**只自动修复当前任务直接导致的问题。**
+
+预存在的问题：
+- 记录到 `deferred-items.md`
+- **不要**修复
+- **不要**反复运行构建期望问题消失
+
+### 修复尝试限制
+
+在单个任务上自动修复失败 **3 次**后：
+- **STOP** - 停止修复
+- 在 SUMMARY.md 记录 "Deferred Issues"
+- 继续下一个任务 (或返回 checkpoint 如果被阻塞)
+- **不要**重新运行构建寻找更多问题
+
+### 偏差记录格式
+
+在 SUMMARY.md 中记录：
+
+```markdown
+## Deviations from Plan
+
+### Auto-fixed Issues
+
+**1. [Rule 1 - Bug] Fixed case-sensitive email uniqueness**
+- **Found during:** Task 4
+- **Issue:** Email comparison was case-sensitive, allowing duplicate emails
+- **Fix:** Added `.toLowerCase()` to email comparison
+- **Files modified:** src/auth/user.service.ts
+- **Commit:** abc123f
+
+**2. [Rule 2 - Security] Added missing input validation**
+- **Found during:** Task 5
+- **Issue:** POST endpoint accepted empty payload
+- **Fix:** Added zod validation schema
+- **Files modified:** src/api/routes.ts, src/api/schemas.ts
+- **Commit:** def456g
+
+### Deferred Issues
+
+- Pre-existing lint warning in src/legacy/utils.ts (out of scope)
+```
+
+---
+
+## Checkpoint 系统
+
+当任务需要用户介入时，返回结构化的 checkpoint 消息。
+
+### 核心原则
+
+```
+Automation-First: 如果 Claude 能通过 CLI/API 做，Claude 必须做。
+Checkpoint 用于验证自动化之后，而非替代自动化。
+```
+
+### Checkpoint 类型
+
+| 类型 | 用途 | 频率 | 处理方式 |
+|------|------|------|----------|
+| `human-verify` | 视觉/功能验证 | 90% | 自动化完成后暂停 |
+| `decision` | 实现选择 | 9% | 提供选项让用户选择 |
+| `human-action` | 无法自动化的手动步骤 | 1% | 真正需要人操作 |
+| `auth-gate` | 认证/授权问题 | 动态 | 需要用户配置凭证 |
+
+### Automation-First 判断
+
+| 操作 | 自动化方式 | 是否需要 Checkpoint |
+|------|-----------|---------------------|
+| 部署到 Vercel | `vercel --yes` | ❌ 不需要 |
+| 创建数据库 | Provider CLI | ❌ 不需要 |
+| 运行构建 | `npm run build` | ❌ 不需要 |
+| 创建文件 | Write tool | ❌ 不需要 |
+| 验证 UI 功能 | 需要人点击 | ✅ human-verify |
+| 选择技术方案 | 需要人决策 | ✅ decision |
+| 点击邮件验证链接 | 无 API | ✅ human-action |
+| 输入 API Key | 需要人提供 | ✅ auth-gate |
+
+### Checkpoint 处理流程
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    CHECKPOINT PROCESSING                            │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  遇到 checkpoint 任务                                                │
+│       │                                                             │
+│       ▼                                                             │
+│  ┌─────────────────────┐                                            │
+│  │ 类型判断            │                                            │
+│  └─────────────────────┘                                            │
+│       │                                                             │
+│       ├── human-verify ──────────────────────────────────┐          │
+│       │   1. 确保自动化已完成                              │          │
+│       │   2. 提供验证步骤                                  │          │
+│       │   3. 等待用户确认                                  │          │
+│       │                                                   ▼          │
+│       │                                          ┌────────────────┐ │
+│       │                                          │ 用户: "通过"   │ │
+│       │                                          │ 或描述问题     │ │
+│       │                                          └────────────────┘ │
+│       │                                                   │          │
+│       ├── decision ─────────────────────────────────────┐          │
+│       │   1. 提供选项表格                                │          │
+│       │   2. 等待用户选择                                │          │
+│       │   3. 按选择继续                                  ▼          │
+│       │                                          ┌────────────────┐ │
+│       │                                          │ 用户: "选项 A" │ │
+│       │                                          └────────────────┘ │
+│       │                                                   │          │
+│       ├── human-action ─────────────────────────────────┐          │
+│       │   1. 说明需要做什么                              │          │
+│       │   2. 提供验证命令                                │          │
+│       │   3. 等待用户完成                                ▼          │
+│       │                                          ┌────────────────┐ │
+│       │                                          │ 用户: "完成"   │ │
+│       │                                          └────────────────┘ │
+│       │                                                   │          │
+│       └── auth-gate ─────────────────────────────────────┐          │
+│           1. 识别需要什么凭证                            │          │
+│           2. 提供获取步骤                                │          │
+│           3. 等待用户配置                                ▼          │
+│                                                  ┌────────────────┐ │
+│                                                  │ 用户: 配置完成 │ │
+│                                                  └────────────────┘ │
+│                                                           │          │
+│                                                           ▼          │
+│                                                    继续执行           │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Authentication Gates
+
+**认证错误是 gates，不是 failures。**
+
+**识别标志：** "Not authenticated", "Unauthorized", "401", "403", "Please run {tool} login", "Set {ENV_VAR}"
+
+**处理协议：**
+
+```markdown
+## CHECKPOINT: AUTH-GATE
+
+**Type:** auth-gate
+**Service:** [service name]
+
+### 需要的操作
+
+1. 获取 [API Key/Token]
+   - 访问: [dashboard URL]
+   - 导航到: [具体位置]
+
+2. 配置凭证
+   ```bash
+   export SERVICE_API_KEY="your-key-here"
+   # 或添加到 .env
+   ```
+
+3. 验证
+   ```bash
+   [verification command]
+   ```
+
+### 恢复
+
+配置完成后，输入: `continue`
+```
+
+### Checkpoint 返回格式
+
+#### human-verify
+
+```markdown
+## CHECKPOINT REACHED
+
+**Type:** human-verify
+**Plan:** {phase}-{plan}
+**Progress:** {completed}/{total} tasks complete
+
+### What Was Built
+
+[Claude 自动完成了什么]
+
+### How to Verify
+
+1. [验证步骤 1]
+2. [验证步骤 2]
+3. [验证步骤 3]
+
+**Expected:** [期望看到什么]
+
+### Awaiting
+
+- 输入 `通过` 确认功能正常
+- 或描述发现的问题
+```
+
+#### decision
+
+```markdown
+## CHECKPOINT REACHED
+
+**Type:** decision
+**Plan:** {phase}-{plan}
+**Decision:** [需要决定什么]
+
+### Context
+
+[为什么需要这个决定]
+
+### Options
+
+| Option | Pros | Cons |
+|--------|------|------|
+| A: [name] | [benefits] | [tradeoffs] |
+| B: [name] | [benefits] | [tradeoffs] |
+| C: [name] | [benefits] | [tradeoffs] |
+
+**Recommended:** [A/B/C]
+
+### Awaiting
+
+选择: `A`, `B`, 或 `C`
+```
+
+#### human-action
+
+```markdown
+## CHECKPOINT REACHED
+
+**Type:** human-action
+**Plan:** {phase}-{plan}
+**Action Required:** [需要什么手动操作]
+
+### Steps
+
+1. [手动步骤 1]
+2. [手动步骤 2]
+
+### Verification
+
+完成后运行:
+```bash
+[verification command]
+```
+
+### Awaiting
+
+完成后输入: `continue`
+```
+
+### Auto-Mode 支持
+
+**当用户启用 auto-mode (`--auto` 或配置 `auto_advance: true`)：**
+
+| Checkpoint 类型 | Auto-Mode 行为 |
+|----------------|----------------|
+| `human-verify` | 自动通过，记录日志 |
+| `decision` | 选择推荐选项 |
+| `human-action` | 正常 STOP (无法自动化) |
+| `auth-gate` | 正常 STOP (需要凭证) |
+
+### 恢复执行
+
+用户响应 checkpoint 后：
+
+```markdown
+## Resuming from Checkpoint
+
+**Checkpoint Type:** [type]
+**User Response:** [response]
+
+### Continuing
+
+- [ ] 验证用户响应
+- [ ] 处理结果 (通过/问题/选择)
+- [ ] 继续下一任务
+```
+
+---
+
+## 错误处理 (旧版保留)
 
 ### 自动解决 (规则 1-3)
 

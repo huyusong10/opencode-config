@@ -300,6 +300,7 @@
   "plugin": [
     "@mohak34/opencode-notifier@latest", 
     "opencode-pty@latest", 
-    "@my-org/custom-plugin"
+    "@my-org/custom-plugin",
+    "./plugin/guard.ts"
   ]
 }

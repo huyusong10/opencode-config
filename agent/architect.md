@@ -115,6 +115,119 @@ cat pyproject.toml 2>/dev/null | head -30
 
 ### 阶段 3: 规划
 
+#### 3.0 Goal-Backward Methodology (目标反推法)
+
+**在创建任何计划之前，必须应用目标反推法。**
+
+**核心思想：**
+- 正向规划："我们应该构建什么？" → 产生任务
+- 目标反推："目标要达成，什么必须为真？" → 产生需求必须满足的条件
+
+**五步流程：**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   Goal-Backward Methodology                 │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Step 1: 陈述目标                                           │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ 从 ROADMAP.md 提取阶段目标                            │   │
+│  │ 必须是结果导向，而非任务导向                          │   │
+│  │ 好: "可工作的聊天界面" (结果)                         │   │
+│  │ 坏: "构建聊天组件" (任务)                             │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                         ↓                                   │
+│  Step 2: 推导可观察真理                                     │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ 问题: "目标要达成，什么必须为真？"                     │   │
+│  │ 列出 3-7 条从用户视角可验证的行为                     │   │
+│  │                                                       │   │
+│  │ 示例 (聊天界面):                                      │   │
+│  │ - 用户能看到现有消息                                  │   │
+│  │ - 用户能输入新消息                                    │   │
+│  │ - 用户能发送消息                                      │   │
+│  │ - 发送的消息出现在列表中                              │   │
+│  │ - 消息刷新后持久存在                                  │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                         ↓                                   │
+│  Step 3: 推导必需产物                                       │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ 对每条真理问: "这要为真，什么必须存在？"              │   │
+│  │                                                       │   │
+│  │ "用户能看到现有消息" 需要:                            │   │
+│  │ - 消息列表组件 (渲染 Message[])                       │   │
+│  │ - 消息状态 (从某处加载)                               │   │
+│  │ - API 路由或数据源 (提供消息)                         │   │
+│  │ - Message 类型定义 (数据形状)                         │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                         ↓                                   │
+│  Step 4: 推导必需连接                                       │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ 对每个产物问: "这要工作，什么必须连接？"              │   │
+│  │                                                       │   │
+│  │ 消息列表组件连接:                                     │   │
+│  │ - 导入 Message 类型 (不用 any)                        │   │
+│  │ - 接收 messages prop 或从 API 获取                   │   │
+│  │ - 遍历 messages 渲染 (不硬编码)                       │   │
+│  │ - 处理空状态 (不只是崩溃)                             │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                         ↓                                   │
+│  Step 5: 识别关键链路                                       │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ 问题: "哪里最可能断？"                                │   │
+│  │ 关键链路 = 断裂会导致级联失败的连接                   │   │
+│  │                                                       │   │
+│  │ 聊天界面关键链路:                                     │   │
+│  │ - Input onSubmit → API 调用 (断了: 能打不能发)        │   │
+│  │ - API save → 数据库 (断了: 看似发送但不持久)          │   │
+│  │ - Component → 真实数据 (断了: 显示占位符)             │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**输出：must_haves 结构**
+
+将目标反推结果写入 PLAN.md 的 frontmatter：
+
+```yaml
+must_haves:
+  truths:
+    - "User can see existing messages"
+    - "User can send a message"
+    - "Messages persist across refresh"
+  artifacts:
+    - path: "src/components/Chat.tsx"
+      provides: "Message list rendering"
+      min_lines: 30
+    - path: "src/app/api/chat/route.ts"
+      provides: "Message CRUD operations"
+      exports: ["GET", "POST"]
+    - path: "prisma/schema.prisma"
+      provides: "Message model"
+      contains: "model Message"
+  key_links:
+    - from: "src/components/Chat.tsx"
+      to: "/api/chat"
+      via: "fetch in useEffect"
+      pattern: "fetch.*api/chat"
+    - from: "src/app/api/chat/route.ts"
+      to: "prisma.message"
+      via: "database query"
+      pattern: "prisma\\.message\\.(find|create)"
+```
+
+**常见错误：**
+
+| 问题 | 错误示例 | 正确示例 |
+|------|----------|----------|
+| 真理太模糊 | "用户能使用聊天" | "用户能看到消息"、"用户能发送消息" |
+| 产物太抽象 | "聊天系统"、"认证模块" | "src/components/Chat.tsx"、"src/api/auth/login/route.ts" |
+| 缺少连接 | 只列出组件，不说如何连接 | "Chat.tsx 通过 useEffect 从 /api/chat 获取数据" |
+
+---
+
 #### 3.1 创建项目结构
 
 如果是新项目，创建 `.planning/`：
@@ -204,22 +317,216 @@ mkdir -p .planning/phases
 
 ## 当前位置
 - 阶段: 1 / N
-- 状态: 准备执行
+- 计划: 1 / M
+- 状态: 准备执行 | 进行中 | 已完成 | 阻塞
 - 最后活动: [时间戳]
+- 停止于: [最后完成的计划/任务]
 
 ## 进度
-[░░░░░░░░░░] 0%
+[░░░░░░░░░░] 0% (0/N 阶段完成)
+
+---
 
 ## 性能指标
-- 已完成计划: 0
-- 平均时长: -
+
+| 指标 | 值 |
+|------|-----|
+| 已完成计划 | 0 |
+| 平均计划时长 | - |
+| 总任务数 | 0 |
+| 已完成任务 | 0 |
+| Deviation 数 | 0 |
+
+---
+
+## 决策记录
+
+| 日期 | 阶段 | 决策 | 原因 |
+|------|------|------|------|
+| - | - | - | - |
+
+---
+
+## 当前阻塞
+
+| ID | 描述 | 阻塞类型 | 发现时间 | 状态 |
+|----|------|----------|----------|------|
+| - | - | - | - | - |
+
+**阻塞类型：** `technical` | `external` | `decision` | `resource`
+
+---
+
+## 待办事项
+
+- [ ] [待办项 1]
+- [ ] [待办项 2]
+
+---
+
+## 会话历史
+
+| 时间 | 操作 | 结果 |
+|------|------|------|
+| [时间戳] | 项目初始化 | 创建 .planning/ 结构 |
+
+---
+
+## 备注
+[任何重要信息]
 ```
+
+**STATE.md 维护规则：**
+
+| 字段 | 更新时机 | 更新者 |
+|------|----------|--------|
+| 当前位置 | 每个计划完成 | Maker |
+| 进度 | 每个阶段完成 | Maker |
+| 性能指标 | 每个计划完成 | Maker |
+| 决策记录 | 关键决策时 | Architect/Maker |
+| 当前阻塞 | 发现/解决阻塞 | Maker |
+| 待办事项 | 捕获想法时 | 任意 |
+| 会话历史 | 每次重要操作 | 任意 |
 
 ---
 
 ### 阶段 4: 阶段规划
 
 为每个阶段创建详细计划：
+
+#### 4.0 依赖分析与 Wave 分组
+
+**在创建 PLAN.md 之前，必须进行依赖分析和 Wave 分组。**
+
+##### 依赖图构建
+
+对每个任务记录：
+- `needs`: 执行前必须存在的内容
+- `creates`: 执行后产出的内容
+- `has_checkpoint`: 是否需要用户确认
+
+**示例：6 个任务的依赖图**
+
+```
+Task A (User model):    needs nothing, creates src/models/user.ts
+Task B (Product model): needs nothing, creates src/models/product.ts
+Task C (User API):      needs Task A, creates src/api/users.ts
+Task D (Product API):   needs Task B, creates src/api/products.ts
+Task E (Dashboard):     needs Task C + D, creates src/components/Dashboard.tsx
+Task F (Verify UI):     checkpoint:human-verify, needs Task E
+
+Graph:
+  A --> C --\
+              --> E --> F
+  B --> D --/
+
+Wave analysis:
+  Wave 1: A, B (independent roots)
+  Wave 2: C, D (depend only on Wave 1)
+  Wave 3: E (depends on Wave 2)
+  Wave 4: F (checkpoint, depends on Wave 3)
+```
+
+##### 垂直切片 vs 水平分层
+
+**优先使用垂直切片：**
+```
+Plan 01: User feature (model + API + UI)
+Plan 02: Product feature (model + API + UI)
+Plan 03: Order feature (model + API + UI)
+
+结果：所有三个计划可并行执行 (Wave 1)
+```
+
+**避免水平分层：**
+```
+Plan 01: Create User model, Product model, Order model
+Plan 02: Create User API, Product API, Order API
+Plan 03: Create User UI, Product UI, Order UI
+
+结果：完全串行 (02 依赖 01，03 依赖 02)
+```
+
+**何时使用垂直切片：** 功能独立、自包含、无跨功能依赖
+
+**何时需要水平分层：** 共享基础 (auth before protected features)、真正类型依赖、基础设施设置
+
+##### 文件所有权与并行执行
+
+独占文件所有权防止冲突：
+
+```yaml
+# Plan 01 frontmatter
+files_modified: [src/models/user.ts, src/api/users.ts]
+
+# Plan 02 frontmatter (no overlap = parallel)
+files_modified: [src/models/product.ts, src/api/products.ts]
+```
+
+无重叠 → 可并行。文件在多个计划中 → 后者依赖前者。
+
+##### Wave 分组算法
+
+```
+waves = {}
+for each plan in plan_order:
+  if plan.depends_on is empty:
+    plan.wave = 1
+  else:
+    plan.wave = max(waves[dep] for dep in plan.depends_on) + 1
+  waves[plan.id] = plan.wave
+```
+
+##### Wave 分组输出
+
+在阶段目录创建 `WAVE-STRUCTURE.md`:
+
+```markdown
+# Wave 结构
+
+## 概览
+
+| Wave | Plans | 并行 | 有 Checkpoint |
+|------|-------|------|---------------|
+| 1 | 01-user, 02-product | ✅ | No |
+| 2 | 03-orders, 04-cart | ✅ | No |
+| 3 | 05-checkout | No | Yes |
+
+## 详细结构
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│  PHASE EXECUTION                                                   │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  WAVE 1 (parallel)          WAVE 2 (parallel)          WAVE 3      │
+│  ┌─────────┐ ┌─────────┐    ┌─────────┐ ┌─────────┐    ┌─────────┐ │
+│  │ Plan 01 │ │ Plan 02 │ →  │ Plan 03 │ │ Plan 04 │ →  │ Plan 05 │ │
+│  │         │ │         │    │         │ │         │    │         │ │
+│  │ User    │ │ Product │    │ Orders  │ │ Cart    │    │ Checkout│ │
+│  │ Model   │ │ Model   │    │ API     │ │ API     │    │ UI      │ │
+│  └─────────┘ └─────────┘    └─────────┘ └─────────┘    └─────────┘ │
+│       │           │              ↑           ↑              ↑      │
+│       └───────────┴──────────────┴───────────┘              │      │
+│              Dependencies: Plan 03 needs Plan 01            │      │
+│                          Plan 04 needs Plan 02              │      │
+│                          Plan 05 needs Plans 03 + 04        │      │
+│                                                                    │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+## 依赖关系
+
+| Plan | Depends On | Wave |
+|------|------------|------|
+| 01-user | - | 1 |
+| 02-product | - | 1 |
+| 03-orders | 01-user | 2 |
+| 04-cart | 02-product | 2 |
+| 05-checkout | 03-orders, 04-cart | 3 |
+```
+
+---
 
 #### 4.1 创建 CONTEXT.md
 
@@ -253,6 +560,17 @@ depends_on: []
 files_modified: []
 autonomous: true
 requirements: [REQ-01]
+must_haves:
+  truths:
+    - "[Observable truth 1]"
+    - "[Observable truth 2]"
+  artifacts:
+    - path: "[file path]"
+      provides: "[what this provides]"
+  key_links:
+    - from: "[source]"
+      to: "[destination]"
+      via: "[connection method]"
 ---
 
 # 计划: [名称]
@@ -277,6 +595,20 @@ requirements: [REQ-01]
 ## 成功标准
 [可衡量的完成条件]
 ```
+
+**frontmatter 字段说明：**
+
+| 字段 | 必需 | 说明 |
+|------|------|------|
+| `phase` | 是 | 阶段标识 (e.g., `01-foundation`) |
+| `plan` | 是 | 阶段内计划编号 |
+| `execution_mode` | 是 | 执行模式 |
+| `wave` | 是 | 执行波次 (用于并行调度) |
+| `depends_on` | 是 | 依赖的其他计划 ID |
+| `files_modified` | 是 | 此计划涉及的文件 |
+| `autonomous` | 是 | 是否可自动执行 (无 checkpoint 时为 true) |
+| `requirements` | 是 | 覆盖的需求 ID 列表 |
+| `must_haves` | 是 | **目标反推结果**，包含 truths, artifacts, key_links |
 
 ---
 
