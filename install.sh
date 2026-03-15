@@ -3,16 +3,16 @@
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/USER/REPO/main/install.sh | bash
-#   ./install.sh [--copy|--link]
+#   ./install.sh [--link]
 #
 # Modes:
-#   --link  Create symlinks (default, allows git pull updates)
-#   --copy  Copy files (standalone installation)
+#   --copy  Copy files (default, standalone installation)
+#   --link  Create symlinks (debug mode, may conflict with existing configs)
 
 set -e
 
 CONFIG_DIR="$HOME/.config/opencode"
-MODE="link"
+MODE="copy"
 
 # Parse arguments
 for arg in "$@"; do
@@ -33,21 +33,51 @@ fi
 
 echo "==> Installing opencode-config (mode: $MODE)"
 
-# Backup existing config (but keep opencode.json for merging)
+# Check if config directory is writable
 if [ -d "$CONFIG_DIR" ]; then
-    BACKUP="$CONFIG_DIR/backup_$(date +%Y%m%d_%H%M%S)"
-    echo "==> Backing up existing config to $BACKUP"
-    mkdir -p "$BACKUP"
-    for item in AGENTS.md agent command plugin ref skills tui.json; do
-        [ -e "$CONFIG_DIR/$item" ] && mv "$CONFIG_DIR/$item" "$BACKUP/" 2>/dev/null || true
-    done
-    # Backup opencode.json but keep it for merging
-    if [ -f "$CONFIG_DIR/opencode.json" ]; then
-        cp "$CONFIG_DIR/opencode.json" "$BACKUP/"
+    if [ ! -w "$CONFIG_DIR" ]; then
+        echo "==> ERROR: Config directory '$CONFIG_DIR' is not writable."
+        echo "==> Please check permissions or run with appropriate user."
+        exit 1
+    fi
+else
+    # Try to create config directory
+    if ! mkdir -p "$CONFIG_DIR" 2>/dev/null; then
+        echo "==> ERROR: Cannot create config directory '$CONFIG_DIR'."
+        echo "==> Please check permissions: mkdir -p $CONFIG_DIR"
+        exit 1
     fi
 fi
 
-mkdir -p "$CONFIG_DIR"
+# Backup existing config (but keep opencode.json for merging)
+if [ -d "$CONFIG_DIR" ]; then
+    BACKUP="$CONFIG_DIR/backup_$(date +%Y%m%d_%H%M%S)"
+    
+    # Check if backup directory already exists (rare edge case)
+    if [ -d "$BACKUP" ]; then
+        echo "==> WARNING: Backup directory already exists, appending timestamp..."
+        BACKUP="$CONFIG_DIR/backup_$(date +%Y%m%d_%H%M%S)_$$"
+    fi
+    
+    echo "==> Backing up existing config to $BACKUP"
+    if ! mkdir -p "$BACKUP" 2>/dev/null; then
+        echo "==> ERROR: Cannot create backup directory '$BACKUP'."
+        exit 1
+    fi
+    
+    for item in AGENTS.md agent command plugin skills tui.json opencode.json; do
+        if [ -e "$CONFIG_DIR/$item" ]; then
+            if ! mv "$CONFIG_DIR/$item" "$BACKUP/" 2>/dev/null; then
+                echo "==> WARNING: Failed to backup '$item', skipping..."
+            fi
+        fi
+    done
+fi
+
+mkdir -p "$CONFIG_DIR" || {
+    echo "==> ERROR: Cannot create config directory '$CONFIG_DIR'. Permission denied?"
+    exit 1
+}
 
 # Function to merge opencode.json
 merge_opencode_json() {
@@ -71,7 +101,7 @@ def deep_merge(base, override, path=""):
                 # Keep existing value, don't override
                 continue
             
-            # Keys that should deep merge
+            # Keys that should deep merge objects
             if key in ("provider", "mcp"):
                 # Deep merge objects
                 if isinstance(result[key], dict) and isinstance(value, dict):
@@ -124,7 +154,10 @@ try:
     with open(source_file, 'r') as f:
         source = json.load(f)
 except FileNotFoundError:
-    print(f"Source file not found: {source_file}")
+    print(f"ERROR: Source file not found: {source_file}")
+    sys.exit(1)
+except json.JSONDecodeError as e:
+    print(f"ERROR: Invalid JSON in source file: {e}")
     sys.exit(1)
 
 try:
@@ -135,12 +168,19 @@ try:
 except FileNotFoundError:
     # No existing config, use source directly
     merged = source
+except json.JSONDecodeError as e:
+    print(f"ERROR: Invalid JSON in existing config: {e}")
+    print("Falling back to using source config directly...")
+    merged = source
 
-with open(target_file, 'w') as f:
-    json.dump(merged, f, indent=2)
-    f.write('\n')
-
-print(f"Merged config saved to {target_file}")
+try:
+    with open(target_file, 'w') as f:
+        json.dump(merged, f, indent=2)
+        f.write('\n')
+    print(f"Merged config saved to {target_file}")
+except IOError as e:
+    print(f"ERROR: Failed to write merged config: {e}")
+    sys.exit(1)
 PYEOF
         return $?
     fi
@@ -150,7 +190,12 @@ PYEOF
         if [ -f "$target_file" ]; then
             # Simple merge with jq (less smart than Python)
             tmp_file=$(mktemp)
-            jq -s '.[0] * .[1]' "$target_file" "$source_file" > "$tmp_file" && mv "$tmp_file" "$target_file"
+            if jq -s '.[0] * .[1]' "$target_file" "$source_file" > "$tmp_file" && mv "$tmp_file" "$target_file"; then
+                echo "Merged config saved to $target_file (using jq)"
+            else
+                echo "ERROR: Failed to merge config with jq"
+                return 1
+            fi
         else
             cp "$source_file" "$target_file"
         fi
@@ -158,9 +203,12 @@ PYEOF
     fi
     
     # Last resort: just copy (warn user)
-    echo "Warning: Neither python3 nor jq found, cannot merge config. Copying as-is."
+    echo "WARNING: Neither python3 nor jq found, cannot merge config properly. Copying as-is."
     cp "$source_file" "$target_file"
 }
+
+# Files and directories to install (excluding ref/, .planning/, .worktrees/, caches, etc.)
+INSTALL_ITEMS="AGENTS.md agent command plugin skills tui.json rules opencode.json"
 
 # Install
 if [ "$MODE" = "copy" ]; then
@@ -169,63 +217,81 @@ if [ "$MODE" = "copy" ]; then
         # Handle opencode.json separately for merging
         if [ -f "$CONFIG_DIR/opencode.json" ] && [ -f "$REPO_DIR/opencode.json" ]; then
             echo "==> Merging opencode.json..."
-            # Backup original for merge
-            cp "$CONFIG_DIR/opencode.json" "$CONFIG_DIR/opencode.json.bak"
             merge_opencode_json "$REPO_DIR/opencode.json" "$CONFIG_DIR/opencode.json"
         else
             cp "$REPO_DIR/opencode.json" "$CONFIG_DIR/opencode.json"
         fi
-        # Copy other files
-        for item in AGENTS.md agent command plugin ref skills tui.json; do
+        # Copy other files (excluding ref/)
+        for item in $INSTALL_ITEMS; do
+            [ "$item" = "opencode.json" ] && continue  # Already handled
             [ -e "$REPO_DIR/$item" ] && cp -r "$REPO_DIR/$item" "$CONFIG_DIR/"
         done
     else
         TEMP_DIR=$(mktemp -d)
         trap "rm -rf $TEMP_DIR" EXIT
-        git clone --depth 1 https://github.com/your-username/opencode-config.git "$TEMP_DIR" 2>/dev/null
+        echo "==> Cloning repository to temporary directory..."
+        if ! git clone --depth 1 https://github.com/huyusong10/opencode-config.git "$TEMP_DIR" 2>/dev/null; then
+            echo "==> ERROR: Failed to clone repository. Please check your network connection."
+            exit 1
+        fi
         # Handle opencode.json separately for merging
         if [ -f "$CONFIG_DIR/opencode.json" ] && [ -f "$TEMP_DIR/opencode.json" ]; then
             echo "==> Merging opencode.json..."
-            cp "$CONFIG_DIR/opencode.json" "$CONFIG_DIR/opencode.json.bak"
             merge_opencode_json "$TEMP_DIR/opencode.json" "$CONFIG_DIR/opencode.json"
         else
             cp "$TEMP_DIR/opencode.json" "$CONFIG_DIR/opencode.json"
         fi
-        for item in AGENTS.md agent command plugin ref skills tui.json; do
+        # Copy other files (excluding ref/)
+        for item in $INSTALL_ITEMS; do
+            [ "$item" = "opencode.json" ] && continue  # Already handled
             [ -e "$TEMP_DIR/$item" ] && cp -r "$TEMP_DIR/$item" "$CONFIG_DIR/"
         done
     fi
+    echo "==> Installation complete! Config is now independent of the repository."
 else
+    # Link mode - for debugging only
+    echo "==> WARNING: Symlink mode is for debugging only. It may conflict with existing configs."
     if [ "$IS_GIT_REPO" = true ]; then
         echo "==> Creating symlinks..."
         # Handle opencode.json separately for merging in link mode
         if [ -f "$CONFIG_DIR/opencode.json" ] && [ -f "$REPO_DIR/opencode.json" ]; then
             echo "==> Merging opencode.json..."
-            cp "$CONFIG_DIR/opencode.json" "$CONFIG_DIR/opencode.json.bak"
             merge_opencode_json "$REPO_DIR/opencode.json" "$CONFIG_DIR/opencode.json"
         else
             ln -sf "$REPO_DIR/opencode.json" "$CONFIG_DIR/opencode.json"
         fi
-        # Link other files
-        for item in AGENTS.md agent command plugin ref skills tui.json; do
+        # Link other files (excluding ref/)
+        for item in $INSTALL_ITEMS; do
+            [ "$item" = "opencode.json" ] && continue  # Already handled
             [ -e "$REPO_DIR/$item" ] && ln -sf "$REPO_DIR/$item" "$CONFIG_DIR/$item"
         done
         echo "==> Done! Run 'cd $REPO_DIR && git pull' to update."
     else
         echo "==> Cloning repository..."
         REPO_DIR="$HOME/opencode-config"
-        git clone --depth 1 https://github.com/your-username/opencode-config.git "$REPO_DIR" 2>/dev/null || {
-            cd "$REPO_DIR" && git pull
-        }
+        if ! git clone --depth 1 https://github.com/huyusong10/opencode-config.git "$REPO_DIR" 2>/dev/null; then
+            if [ -d "$REPO_DIR/.git" ]; then
+                echo "==> Repository exists, updating..."
+                cd "$REPO_DIR" && git pull || {
+                    echo "==> ERROR: Failed to update repository."
+                    exit 1
+                }
+                cd - > /dev/null
+            else
+                echo "==> ERROR: Failed to clone repository. Please check your network connection."
+                exit 1
+            fi
+        fi
         # Handle opencode.json separately for merging in link mode
         if [ -f "$CONFIG_DIR/opencode.json" ] && [ -f "$REPO_DIR/opencode.json" ]; then
             echo "==> Merging opencode.json..."
-            cp "$CONFIG_DIR/opencode.json" "$CONFIG_DIR/opencode.json.bak"
             merge_opencode_json "$REPO_DIR/opencode.json" "$CONFIG_DIR/opencode.json"
         else
             ln -sf "$REPO_DIR/opencode.json" "$CONFIG_DIR/opencode.json"
         fi
-        for item in AGENTS.md agent command plugin ref skills tui.json; do
+        # Link other files (excluding ref/)
+        for item in $INSTALL_ITEMS; do
+            [ "$item" = "opencode.json" ] && continue  # Already handled
             [ -e "$REPO_DIR/$item" ] && ln -sf "$REPO_DIR/$item" "$CONFIG_DIR/$item"
         done
         echo "==> Done! Run 'cd $REPO_DIR && git pull' to update."

@@ -7,11 +7,21 @@
 ### 一键安装 (macOS/Linux)
 
 ```bash
-# 软链接模式（推荐，便于 git pull 更新）
+# 复制模式（默认，独立安装，不会与现有配置冲突）
 curl -fsSL https://raw.githubusercontent.com/huyusong10/opencode-config/main/install.sh | bash
 
-# 复制模式（独立安装）
-curl -fsSL https://raw.githubusercontent.com/huyusong10/opencode-config/main/install.sh | bash -s -- --copy
+# 软链接模式（仅用于调试，可能导致配置冲突）
+curl -fsSL https://raw.githubusercontent.com/huyusong10/opencode-config/main/install.sh | bash -s -- --link
+```
+
+### 手动安装
+
+```bash
+# macOS/Linux - 复制模式（默认）
+git clone https://github.com/huyusong10/opencode-config.git ~/opencode-config && cd ~/opencode-config && ./install.sh
+
+# macOS/Linux - 软链接模式（仅用于调试）
+git clone https://github.com/huyusong10/opencode-config.git ~/opencode-config && cd ~/opencode-config && ./install.sh --link
 ```
 
 ### 手动安装
@@ -30,8 +40,11 @@ git clone https://github.com/huyusong10/opencode-config.git $env:USERPROFILE\ope
 ### 更新配置
 
 ```bash
-cd ~/opencode-config && git pull   # 软链接模式
-curl -fsSL https://raw.githubusercontent.com/huyusong10/opencode-config/main/install.sh | bash  # 重新安装
+# 复制模式：重新运行安装脚本
+curl -fsSL https://raw.githubusercontent.com/huyusong10/opencode-config/main/install.sh | bash
+
+# 软链接模式：git pull 更新（仅用于调试）
+cd ~/opencode-config && git pull
 ```
 
 ---
