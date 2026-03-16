@@ -1,6 +1,6 @@
 # OpenCode 配置仓库
 
-个人 OpenCode AI 编程助手配置，聚焦于**双前端 Agent 架构**和**Hook 强制约束机制**。
+个人 OpenCode AI 编程助手配置，聚焦于 **Maestro 统一 Agent 架构** 和状态驱动的工作流。
 
 ## 安装
 
@@ -83,7 +83,7 @@ cd ~/opencode-config && git pull
 
 ### 执行模式选择
 
-由 Architect 在规划阶段推荐，Maker 执行：
+由 Maestro 在规划阶段推荐，执行阶段自动调度：
 
 | 模式 | 使用时机 | 流程 |
 |------|----------|------|
@@ -332,8 +332,9 @@ opencode-config/
 ├── AGENTS.md              # AI 行为偏好
 ├── install.sh             # 安装脚本
 ├── agent/
-│   ├── architect.md       # 架构师 Agent
-│   ├── maker.md           # 制造者 Agent
+│   ├── maestro.md         # 统一 Agent（推荐）
+│   ├── architect.md       # 架构师 Agent（向后兼容）
+│   ├── maker.md           # 制造者 Agent（向后兼容）
 │   └── subagent/          # 功能型子代理
 │       ├── coder.md
 │       ├── tester.md
@@ -355,7 +356,9 @@ opencode-config/
 │   ├── subagent.md
 │   ├── deviation-rules.md   # 偏差处理规则
 │   ├── checkpoint-system.md # Checkpoint 系统
-│   └── state-validation.md  # STATE.md 验证
+│   ├── state-validation.md  # STATE.md 验证
+│   ├── planning-mode.md     # 规划模式
+│   └── execution-mode.md    # 执行模式
 └── .planning/             # 项目规划目录（运行时生成）
     ├── PROJECT.md
     ├── REQUIREMENTS.md
@@ -372,8 +375,9 @@ opencode-config/
 ### 职责分离
 
 每个 Agent/Subagent 只做一件事：
-- `architect` 只规划，不碰代码
-- `maker` 只协调，不直接实现
+- `maestro` 统筹规划与执行，像指挥家协调乐队
+- `architect` 只规划，不碰代码（向后兼容）
+- `maker` 只协调，不直接实现（向后兼容）
 - `@coder` 只实现，不修改规范
 - `@reviewer` 只审查，只读权限
 
