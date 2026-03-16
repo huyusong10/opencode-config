@@ -8,6 +8,8 @@
 # Modes:
 #   --copy  Copy files (default, standalone installation)
 #   --link  Create symlinks (debug mode, may conflict with existing configs)
+#
+# Migration: This script migrates opencode.json to opencode.jsonc (JSON with Comments)
 
 set -e
 
@@ -49,7 +51,7 @@ else
     fi
 fi
 
-# Backup existing config (but keep opencode.json for merging)
+# Backup existing config (keep config files for merging)
 if [ -d "$CONFIG_DIR" ]; then
     BACKUP="$CONFIG_DIR/backup_$(date +%Y%m%d_%H%M%S)"
     
@@ -72,10 +74,12 @@ if [ -d "$CONFIG_DIR" ]; then
             fi
         fi
     done
-    # Backup opencode.json separately (copy, not move — keeps it in place for merging)
-    if [ -f "$CONFIG_DIR/opencode.json" ]; then
-        cp "$CONFIG_DIR/opencode.json" "$BACKUP/opencode.json" 2>/dev/null || true
-    fi
+    # Backup config files (copy, not move — keeps them in place for merging)
+    for cfg in opencode.jsonc opencode.json; do
+        if [ -f "$CONFIG_DIR/$cfg" ]; then
+            cp "$CONFIG_DIR/$cfg" "$BACKUP/$cfg" 2>/dev/null || true
+        fi
+    done
 fi
 
 mkdir -p "$CONFIG_DIR" || {
@@ -83,16 +87,99 @@ mkdir -p "$CONFIG_DIR" || {
     exit 1
 }
 
-# Function to merge opencode.json
-merge_opencode_json() {
-    local source_file="$1"
-    local target_file="$2"
+# Function to find existing config file (returns path or empty)
+find_existing_config() {
+    local dir="$1"
+    if [ -f "$dir/opencode.jsonc" ]; then
+        echo "$dir/opencode.jsonc"
+    elif [ -f "$dir/opencode.json" ]; then
+        echo "$dir/opencode.json"
+    fi
+}
+
+# Function to merge opencode config files
+# Supports both JSON and JSONC formats, outputs JSONC
+merge_opencode_config() {
+    local source_file="$1"      # Our config (opencode.jsonc)
+    local target_dir="$2"       # User's config directory
+    local output_file="$target_dir/opencode.jsonc"
     
     # Try Python merge (preferred)
     if command -v python3 &>/dev/null; then
-        python3 << 'PYEOF' "$source_file" "$target_file"
+        python3 << 'PYEOF' "$source_file" "$target_dir" "$output_file"
 import json
+import re
 import sys
+import os
+
+def strip_jsonc_comments(content):
+    """Remove // and /* */ comments from JSONC content."""
+    # Remove single-line comments (// ...)
+    # Be careful not to remove // inside strings
+    result = []
+    i = 0
+    in_string = False
+    string_char = None
+    
+    while i < len(content):
+        char = content[i]
+        
+        # Handle string boundaries
+        if not in_string and char in '"\'':
+            in_string = True
+            string_char = char
+            result.append(char)
+            i += 1
+        elif in_string:
+            if char == '\\' and i + 1 < len(content):
+                # Escape sequence, append both chars
+                result.append(char)
+                result.append(content[i + 1])
+                i += 2
+            elif char == string_char:
+                in_string = False
+                string_char = None
+                result.append(char)
+                i += 1
+            else:
+                result.append(char)
+                i += 1
+        # Handle // comments
+        elif char == '/' and i + 1 < len(content) and content[i + 1] == '/':
+            # Skip until end of line
+            while i < len(content) and content[i] != '\n':
+                i += 1
+        # Handle /* */ comments
+        elif char == '/' and i + 1 < len(content) and content[i + 1] == '*':
+            i += 2
+            while i < len(content):
+                if content[i] == '*' and i + 1 < len(content) and content[i + 1] == '/':
+                    i += 2
+                    break
+                i += 1
+        else:
+            result.append(char)
+            i += 1
+    
+    return ''.join(result)
+
+def parse_jsonc_file(filepath):
+    """Parse a JSON or JSONC file."""
+    with open(filepath, 'r', encoding='utf-8') as f:
+        content = f.read()
+    
+    # Try parsing as-is first (might be valid JSON)
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError:
+        pass
+    
+    # Strip comments and try again
+    try:
+        stripped = strip_jsonc_comments(content)
+        return json.loads(stripped)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON/JSONC in {filepath}: {e}")
 
 def deep_merge(base, override, path=""):
     """Merge override into base with special handling for specific keys."""
@@ -107,13 +194,11 @@ def deep_merge(base, override, path=""):
             
             # Keys that should deep merge objects
             if key in ("provider", "mcp"):
-                # Deep merge objects
                 if isinstance(result[key], dict) and isinstance(value, dict):
                     result[key] = deep_merge(result[key], value, f"{path}.{key}")
                 else:
                     result[key] = value
             elif key == "permission":
-                # Merge permission objects
                 if isinstance(result[key], dict) and isinstance(value, dict):
                     for perm_key, perm_val in value.items():
                         if perm_key in result[key]:
@@ -126,7 +211,6 @@ def deep_merge(base, override, path=""):
                 else:
                     result[key] = value
             elif key == "plugin":
-                # Merge plugin arrays, dedupe
                 if isinstance(result[key], list) and isinstance(value, list):
                     existing = set(result[key])
                     for item in value:
@@ -135,7 +219,6 @@ def deep_merge(base, override, path=""):
                 else:
                     result[key] = value
             elif key == "instructions":
-                # Merge instructions arrays, dedupe
                 if isinstance(result[key], list) and isinstance(value, list):
                     existing = set(result[key])
                     for item in value:
@@ -144,7 +227,6 @@ def deep_merge(base, override, path=""):
                 else:
                     result[key] = value
             else:
-                # Default: override
                 result[key] = value
         else:
             result[key] = value
@@ -152,82 +234,115 @@ def deep_merge(base, override, path=""):
     return result
 
 source_file = sys.argv[1]
-target_file = sys.argv[2]
+target_dir = sys.argv[2]
+output_file = sys.argv[3]
 
+# Find existing config file (prefer opencode.jsonc over opencode.json)
+existing_config = None
+existing_jsonc = os.path.join(target_dir, "opencode.jsonc")
+existing_json = os.path.join(target_dir, "opencode.json")
+
+if os.path.exists(existing_jsonc):
+    existing_config = existing_jsonc
+    has_old_json = False
+elif os.path.exists(existing_json):
+    existing_config = existing_json
+    has_old_json = True
+else:
+    has_old_json = False
+
+# Parse source file (our config)
 try:
-    with open(source_file, 'r') as f:
-        source = json.load(f)
-except FileNotFoundError:
-    print(f"ERROR: Source file not found: {source_file}")
+    source = parse_jsonc_file(source_file)
+except Exception as e:
+    print(f"ERROR: Failed to parse source config: {e}")
     sys.exit(1)
-except json.JSONDecodeError as e:
-    print(f"ERROR: Invalid JSON in source file: {e}")
-    sys.exit(1)
 
-try:
-    with open(target_file, 'r') as f:
-        target = json.load(f)
-    # Merge: target is existing config, source is new config
-    merged = deep_merge(target, source)
-except FileNotFoundError:
-    # No existing config, use source directly
-    merged = source
-except json.JSONDecodeError as e:
-    print(f"ERROR: Invalid JSON in existing config: {e}")
-    print("Falling back to using source config directly...")
+# Merge or use source directly
+if existing_config:
+    try:
+        target = parse_jsonc_file(existing_config)
+        merged = deep_merge(target, source)
+        print(f"Merged config from {existing_config}")
+    except Exception as e:
+        print(f"WARNING: Failed to parse existing config, using source: {e}")
+        merged = source
+else:
     merged = source
 
+# Write output as JSONC (just JSON for now, comments are preserved from source logic)
 try:
-    with open(target_file, 'w') as f:
-        json.dump(merged, f, indent=2)
+    with open(output_file, 'w', encoding='utf-8') as f:
+        json.dump(merged, f, indent=2, ensure_ascii=False)
         f.write('\n')
-    print(f"Merged config saved to {target_file}")
+    print(f"Config saved to {output_file}")
 except IOError as e:
-    print(f"ERROR: Failed to write merged config: {e}")
+    print(f"ERROR: Failed to write config: {e}")
     sys.exit(1)
+
+# Remove old opencode.json if it existed (migration to JSONC)
+if has_old_json and os.path.exists(existing_json):
+    try:
+        os.remove(existing_json)
+        print(f"Removed old {existing_json} (migrated to JSONC)")
+    except Exception as e:
+        print(f"WARNING: Failed to remove old opencode.json: {e}")
 PYEOF
         return $?
     fi
     
-    # Fallback: try jq if available
+    # Fallback: try jq if available (won't handle JSONC comments)
     if command -v jq &>/dev/null; then
-        if [ -f "$target_file" ]; then
-            # Simple merge with jq (less smart than Python)
+        local existing_config
+        existing_config=$(find_existing_config "$target_dir")
+        
+        if [ -n "$existing_config" ]; then
+            echo "==> WARNING: jq cannot parse JSONC comments, using simple merge"
+            local tmp_file
             tmp_file=$(mktemp)
-            if jq -s '.[0] * .[1]' "$target_file" "$source_file" > "$tmp_file" && mv "$tmp_file" "$target_file"; then
-                echo "Merged config saved to $target_file (using jq)"
-            else
-                echo "ERROR: Failed to merge config with jq"
-                return 1
+            # Try to use a simple approach - just copy our config
+            # jq will fail on JSONC, so we copy directly
+            if jq '.' "$source_file" >/dev/null 2>&1; then
+                # Source is valid JSON (no comments or already stripped)
+                if jq '.' "$existing_config" >/dev/null 2>&1; then
+                    # Both are valid JSON
+                    if jq -s '.[0] * .[1]' "$existing_config" "$source_file" > "$tmp_file" 2>/dev/null; then
+                        mv "$tmp_file" "$target_dir/opencode.jsonc"
+                        echo "Merged config saved to $target_dir/opencode.jsonc (using jq)"
+                        # Remove old opencode.json if exists
+                        [ -f "$target_dir/opencode.json" ] && rm -f "$target_dir/opencode.json"
+                        return 0
+                    fi
+                fi
             fi
-        else
-            cp "$source_file" "$target_file"
         fi
-        return $?
+        # Fallback: just copy
+        echo "==> WARNING: jq merge failed, copying config directly"
+        cp "$source_file" "$target_dir/opencode.jsonc"
+        [ -f "$target_dir/opencode.json" ] && rm -f "$target_dir/opencode.json"
+        return 0
     fi
     
     # Last resort: just copy (warn user)
-    echo "WARNING: Neither python3 nor jq found, cannot merge config properly. Copying as-is."
-    cp "$source_file" "$target_file"
+    echo "WARNING: Neither python3 nor jq found, copying config as-is."
+    cp "$source_file" "$target_dir/opencode.jsonc"
+    [ -f "$target_dir/opencode.json" ] && rm -f "$target_dir/opencode.json"
 }
 
 # Files and directories to install (excluding ref/, .planning/, .worktrees/, caches, etc.)
-INSTALL_ITEMS="AGENTS.md agent command plugin skills tui.json rules scripts opencode.json"
+INSTALL_ITEMS="AGENTS.md agent command plugin skills tui.json rules scripts"
 
 # Install
 if [ "$MODE" = "copy" ]; then
     echo "==> Copying files..."
     if [ "$IS_GIT_REPO" = true ]; then
-        # Handle opencode.json separately for merging
-        if [ -f "$CONFIG_DIR/opencode.json" ] && [ -f "$REPO_DIR/opencode.json" ]; then
-            echo "==> Merging opencode.json..."
-            merge_opencode_json "$REPO_DIR/opencode.json" "$CONFIG_DIR/opencode.json"
-        else
-            cp "$REPO_DIR/opencode.json" "$CONFIG_DIR/opencode.json"
+        # Handle opencode.jsonc separately for merging
+        if [ -f "$REPO_DIR/opencode.jsonc" ]; then
+            echo "==> Processing opencode.jsonc..."
+            merge_opencode_config "$REPO_DIR/opencode.jsonc" "$CONFIG_DIR"
         fi
-        # Copy other files (excluding ref/)
+        # Copy other files
         for item in $INSTALL_ITEMS; do
-            [ "$item" = "opencode.json" ] && continue  # Already handled
             [ -e "$REPO_DIR/$item" ] && cp -r "$REPO_DIR/$item" "$CONFIG_DIR/"
         done
     else
@@ -238,16 +353,13 @@ if [ "$MODE" = "copy" ]; then
             echo "==> ERROR: Failed to clone repository. Please check your network connection."
             exit 1
         fi
-        # Handle opencode.json separately for merging
-        if [ -f "$CONFIG_DIR/opencode.json" ] && [ -f "$TEMP_DIR/opencode.json" ]; then
-            echo "==> Merging opencode.json..."
-            merge_opencode_json "$TEMP_DIR/opencode.json" "$CONFIG_DIR/opencode.json"
-        else
-            cp "$TEMP_DIR/opencode.json" "$CONFIG_DIR/opencode.json"
+        # Handle opencode.jsonc separately for merging
+        if [ -f "$TEMP_DIR/opencode.jsonc" ]; then
+            echo "==> Processing opencode.jsonc..."
+            merge_opencode_config "$TEMP_DIR/opencode.jsonc" "$CONFIG_DIR"
         fi
-        # Copy other files (excluding ref/)
+        # Copy other files
         for item in $INSTALL_ITEMS; do
-            [ "$item" = "opencode.json" ] && continue  # Already handled
             [ -e "$TEMP_DIR/$item" ] && cp -r "$TEMP_DIR/$item" "$CONFIG_DIR/"
         done
     fi
@@ -257,16 +369,16 @@ else
     echo "==> WARNING: Symlink mode is for debugging only. It may conflict with existing configs."
     if [ "$IS_GIT_REPO" = true ]; then
         echo "==> Creating symlinks..."
-        # Handle opencode.json separately for merging in link mode
-        if [ -f "$CONFIG_DIR/opencode.json" ] && [ -f "$REPO_DIR/opencode.json" ]; then
-            echo "==> Merging opencode.json..."
-            merge_opencode_json "$REPO_DIR/opencode.json" "$CONFIG_DIR/opencode.json"
-        else
-            ln -sf "$REPO_DIR/opencode.json" "$CONFIG_DIR/opencode.json"
+        # Handle opencode.jsonc - merge if user has existing config, link if not
+        EXISTING_CFG=$(find_existing_config "$CONFIG_DIR")
+        if [ -n "$EXISTING_CFG" ] && [ -f "$REPO_DIR/opencode.jsonc" ]; then
+            echo "==> Merging opencode.jsonc..."
+            merge_opencode_config "$REPO_DIR/opencode.jsonc" "$CONFIG_DIR"
+        elif [ -f "$REPO_DIR/opencode.jsonc" ]; then
+            ln -sf "$REPO_DIR/opencode.jsonc" "$CONFIG_DIR/opencode.jsonc"
         fi
-        # Link other files (excluding ref/)
+        # Link other files
         for item in $INSTALL_ITEMS; do
-            [ "$item" = "opencode.json" ] && continue  # Already handled
             [ -e "$REPO_DIR/$item" ] && ln -sf "$REPO_DIR/$item" "$CONFIG_DIR/$item"
         done
         echo "==> Done! Run 'cd $REPO_DIR && git pull' to update."
@@ -286,16 +398,16 @@ else
                 exit 1
             fi
         fi
-        # Handle opencode.json separately for merging in link mode
-        if [ -f "$CONFIG_DIR/opencode.json" ] && [ -f "$REPO_DIR/opencode.json" ]; then
-            echo "==> Merging opencode.json..."
-            merge_opencode_json "$REPO_DIR/opencode.json" "$CONFIG_DIR/opencode.json"
-        else
-            ln -sf "$REPO_DIR/opencode.json" "$CONFIG_DIR/opencode.json"
+        # Handle opencode.jsonc - merge if user has existing config, link if not
+        EXISTING_CFG=$(find_existing_config "$CONFIG_DIR")
+        if [ -n "$EXISTING_CFG" ] && [ -f "$REPO_DIR/opencode.jsonc" ]; then
+            echo "==> Merging opencode.jsonc..."
+            merge_opencode_config "$REPO_DIR/opencode.jsonc" "$CONFIG_DIR"
+        elif [ -f "$REPO_DIR/opencode.jsonc" ]; then
+            ln -sf "$REPO_DIR/opencode.jsonc" "$CONFIG_DIR/opencode.jsonc"
         fi
-        # Link other files (excluding ref/)
+        # Link other files
         for item in $INSTALL_ITEMS; do
-            [ "$item" = "opencode.json" ] && continue  # Already handled
             [ -e "$REPO_DIR/$item" ] && ln -sf "$REPO_DIR/$item" "$CONFIG_DIR/$item"
         done
         echo "==> Done! Run 'cd $REPO_DIR && git pull' to update."

@@ -69,3 +69,10 @@ ASCII 框图内的内容必须使用 **英文**，禁止中文。
 | 示例 | `@committer` 处理 git 提交 | 读取单个文件 |
 
 详细决策流程：`rules/subagent.md`
+
+---
+
+## Opencode功能拓展
+
+一定要参考官方文档：`https://opencode.ai/docs/zh-cn/sdk/`
+若需要SDK，使用以下命令安装：`npm install @opencode-ai/sdk`
