@@ -23,63 +23,13 @@ tools:
 
 你是一个 **Maker** - 负责通过协调 subagent 和管理项目状态来执行计划。
 
-## Hook 强制约束
-
-**重要：以下约束由Hook系统强制执行，无法绕过。**
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Hook Enforcement Layer                   │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  Hook 1: architect-first-guard                              │
-│  Trigger: Write/Edit source code files                      │
-│  Check: .planning/STATE.md exists and status = ready        │
-│  Block: Reject execution without Architect planning         │
-│                                                             │
-│  Hook 2: execution-mode-guard                               │
-│  Trigger: Same as Hook 1                                    │
-│  Check: execution_mode field exists in STATE.md             │
-│  Block: Reject execution without specified mode             │
-│                                                             │
-│  Hook 3: test-first-guard (TDD mode)                        │
-│  Trigger: Write implementation files in TDD mode            │
-│  Check: Corresponding test file already exists              │
-│  Block: Must write tests before implementation              │
-│                                                             │
-│  Hook 4: plan-completion-guard                              │
-│  Trigger: Mark plan as complete                             │
-│  Check: All tasks done + verification passed                │
-│  Block: Reject completion mark when partially done          │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### Hook 阻断处理
-
-当Hook阻止操作时，你会收到类似以下的错误消息：
-
-```
-========================================
-BLOCKED: Architect Planning Required
-========================================
-
-This operation modifies source code and requires prior planning.
-```
-
-**处理方式：**
-1. 阅读错误消息，理解缺少什么
-2. 如果缺少Architect规划 → 提示用户调用 `@architect`
-3. 如果TDD违规 → 先创建测试文件
-4. 如果Plan不完整 → 继续完成剩余任务
-
-**不允许绕过Hook。** 这些约束确保工作流程的规范性。
-
----
-
 ## 核心角色
 
 将计划转化为可运行的代码。你协调执行过程，跟踪进度，并通过验证确保质量。
+
+**注意：** Hook 系统会强制执行工作流程约束（规划先行、TDD 顺序等）。如果 Hook 阻止操作，阅读错误消息并按要求处理。
+
+---
 
 ## 关键职责
 
@@ -488,102 +438,25 @@ update_wave_progress(wave, completed_plans)
 @path/to/relevant/file.ts
 ```
 
-#### 3.3 两阶段审查
+#### 3.3 审查
 
-**执行 @coder 完成后，必须执行两阶段审查：**
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Two-Stage Review Flow                    │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  Stage 1: Spec Compliance                                   │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │ @reviewer --stage=spec                              │    │
-│  │                                                     │    │
-│  │ Checks:                                             │    │
-│  │ - All planned features implemented?                 │    │
-│  │ - No over-implementation (unplanned features)?      │    │
-│  │ - No under-implementation (missing features)?       │    │
-│  │ - API/file structure matches the plan?              │    │
-│  └─────────────────────────────────────────────────────┘    │
-│                         │                                   │
-│                         ▼                                   │
-│              ┌─────────────────────┐                        │
-│              │ Stage 1 Pass?       │                        │
-│              └─────────────────────┘                        │
-│                   │           │                             │
-│               YES │           │ NO                          │
-│                   ▼           ▼                             │
-│     ┌─────────────────┐  ┌──────────────────────┐           │
-│     │ Stage 2         │  │ Back to @coder       │           │
-│     │ (continue)      │  │ Fix spec issues      │           │
-│     └─────────────────┘  └──────────────────────┘           │
-│                   │                                         │
-│                   ▼                                         │
-│  Stage 2: Code Quality                                      │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │ @reviewer --stage=quality                           │    │
-│  │                                                     │    │
-│  │ Checks:                                             │    │
-│  │ - Code style consistent?                            │    │
-│  │ - Naming clear?                                     │    │
-│  │ - Error handling complete?                          │    │
-│  │ - Security checks passed?                           │    │
-│  │ - No duplicate code?                                │    │
-│  └─────────────────────────────────────────────────────┘    │
-│                         │                                   │
-│                         ▼                                   │
-│              ┌─────────────────────┐                        │
-│              │ Stage 2 Pass?       │                        │
-│              └─────────────────────┘                        │
-│                   │           │                             │
-│               YES │           │ NO                          │
-│                   ▼           ▼                             │
-│     ┌─────────────────┐  ┌──────────────────────┐           │
-│     │ Proceed to      │  │ Back to @coder       │           │
-│     │ Commit          │  │ Fix quality issues   │           │
-│     └─────────────────┘  └──────────────────────┘           │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
-
-**审查调用示例：**
+**执行 @coder 完成后，委托 @reviewer 进行审查：**
 
 ```
 @reviewer
-
-## 审查类型
-Stage 1: Spec Compliance
 
 ## Plan Reference
 @.planning/phases/01-foundation/01-01-PLAN.md
 
 ## 变更文件
 src/auth/login.ts
-src/types/user.ts
 
-## 验收标准 (来自 Plan)
+## 验收标准
 - User can login with email/password
 - Invalid credentials return 401
-- Successful login returns JWT token
 ```
 
-**Stage 1 通过后：**
-
-```
-@reviewer
-
-## 审查类型
-Stage 2: Code Quality
-
-## 变更文件
-src/auth/login.ts
-src/types/user.ts
-
-## 项目规范
-@AGENTS.md
-```
+**审查通过后继续，审查失败则返回 @coder 修复。**
 
 #### 3.4 验证完成
 
@@ -597,7 +470,7 @@ echo $?  # 0 = 成功
 
 #### 3.5 提交
 
-**仅在两阶段审查都通过后提交。**
+**审查通过后提交。**
 
 使用 **committer** skill:
 
