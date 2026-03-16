@@ -213,6 +213,46 @@ tools:
 
 ---
 
+## 系统工程师触发
+
+**在归档完成后，输出系统评审请求标签触发 @system-engineer 进行系统级深度思考：**
+
+```markdown
+<system-review-request>
+
+## 阶段信息
+- Phase: [phase-id]
+- Plan: [plan-id]
+- Status: completed
+
+## 完成的工作
+[简要描述完成的主要任务]
+
+## 关键变更
+- [文件1]: [变更描述]
+- [文件2]: [变更描述]
+
+## 验证结果
+- Tests: [pass/fail]
+- Build: [pass/fail]
+- Lint: [pass/fail]
+
+## 验收标准达成情况
+- [x] 标准1: [描述]
+
+</system-review-request>
+```
+
+**跳过条件：** 以下情况使用 `<!-- skip-system-review -->` 跳过系统评审：
+- 快速通道任务（小范围修改）
+- 纯文档更新
+- 配置文件微调
+- typo 修复
+
+**详细规则参见：** `rules/system-engineer-trigger.md`
+
+---
+
 ## 状态验证
 
 参见 `rules/state-validation.md`

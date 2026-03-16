@@ -499,6 +499,51 @@ mv .planning/phases/[phase]/[plan]-PLAN.md .planning/phases/[phase]/archive/
 
 ---
 
+## 系统工程师触发
+
+**在归档完成后输出系统评审请求：**
+
+```markdown
+<system-review-request>
+
+## 阶段信息
+- Phase: [phase-id]
+- Plan: [plan-id]
+- Execution Mode: [mode]
+- Status: completed
+
+## 完成的任务
+| 任务 | 文件 | 状态 |
+|------|------|------|
+| 任务1 | file1.ts | ✅ |
+
+## 代码变更摘要
+[主要代码变更的描述]
+
+## 测试结果
+- Unit Tests: [N passed, M failed]
+- Coverage: [percentage]
+
+## 构建状态
+- Build: ✅ success
+- Lint: ✅ no errors
+
+## 遗留问题
+- [如有遗留问题列出]
+
+</system-review-request>
+```
+
+**跳过条件：** 以下情况使用 `<!-- skip-system-review -->` 跳过系统评审：
+- 快速通道任务（小范围修改）
+- 纯文档更新
+- 配置文件微调
+- typo 修复
+
+**详细规则参见：** `rules/system-engineer-trigger.md`
+
+---
+
 ## 重要规则
 
 - 遵循 PLAN.md 中指定的 execution_mode

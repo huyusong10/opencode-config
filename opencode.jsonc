@@ -243,7 +243,22 @@
     // - 多次失败时增强提示，避免重复相同错误
     //
     // 配置文件: plugin/deep-explore-prompts.yaml
-    "./plugin/deep-explore-guide.ts"
+    "./plugin/deep-explore-guide.ts",
+
+    // System Loop 系统工程师迭代插件 - 流程末端的系统思考
+    //
+    // 设计理念: 自动触发系统级深度思考，发现潜在问题，提出改进建议
+    //
+    // 触发场景:
+    // - Maestro/Architect/Maker 完成主要工作后
+    // - 检测到 <system-review-request> 标签时自动触发 @system-engineer
+    //
+    // 迭代控制:
+    // - 最大迭代次数: 可配置，默认 3 次
+    // - 退出条件: decision="done" 或达到最大迭代
+    //
+    // 配置文件: plugin/system-loop-config.yaml
+    "./plugin/system-loop.ts"
   ],
 
   // ============================================================================
@@ -266,6 +281,8 @@
     // 规划模式 - 需求探索、Goal-Backward、Wave 分组
     "rules/planning-mode.md",
     // 执行模式 - 模式调度、快速通道、归档流程
-    "rules/execution-mode.md"
+    "rules/execution-mode.md",
+    // 系统工程师触发规则 - 触发条件、输出格式、跳过条件
+    "rules/system-engineer-trigger.md"
   ]
 }

@@ -717,12 +717,43 @@ must_haves:
 **推荐:** [模式]
 **原因:** [原因]
 
+<system-review-request>
+
+## 阶段信息
+- Project: [名称]
+- Phase: [N]
+- Status: ready
+
+## 规划内容
+[简要描述规划的主要内容和决策]
+
+## 关键决策
+- [决策1]: [原因]
+
+## 技术栈
+[选择的技术栈及原因]
+
+## 风险识别
+- [风险1]: [缓解措施]
+
+</system-review-request>
+
 ### 下一步
 开始执行：
 ```
 @maker
 ```
 ```
+
+---
+
+## 系统工程师触发
+
+**在规划完成后，输出系统评审请求标签触发 @system-engineer 进行系统级深度思考。**
+
+**跳过条件：** 简单规划、小范围修改可使用 `<!-- skip-system-review -->` 跳过。
+
+**详细规则参见：** `rules/system-engineer-trigger.md`
 
 ---
 

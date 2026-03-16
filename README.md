@@ -80,6 +80,7 @@ cd ~/opencode-config && git pull
 | @reviewer | 审查代码正确性和质量 | 只读 |
 | @researcher | 研究技术、模式和解决方案 | 只读 |
 | @committer | 原子化 git 提交 | 只读 + bash |
+| @system-engineer | 系统级深度思考和架构分析 (温度 0.7) | 只读 |
 
 ### 执行模式选择
 
@@ -250,6 +251,55 @@ Maker 负责执行 Architect 创建的计划，协调 subagent 并管理状态�
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
+### System Engineer Workflow
+
+在 Maestro/Architect/Maker 完成主要工作后，自动触发系统级深度思考。
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                       System Engineer Workflow                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Primary Agent completes work                                               │
+│       |                                                                     │
+│       v                                                                     │
+│  Output: <system-review-request> tag                                        │
+│       |                                                                     │
+│       v                                                                     │
+│  system-loop plugin detects tag on session.idle                             │
+│       |                                                                     │
+│       +-- Skip tag detected? -> End                                         │
+│       |                                                                     │
+│       v                                                                     │
+│  Trigger @system-engineer (temperature 0.7, read-only)                      │
+│       |                                                                     │
+│       v                                                                     │
+│  System Analysis:                                                           │
+│  +---------------------------------------------------------------------+    │
+│  | - Architecture consistency (30%)                                    |    │
+│  | - Design quality (25%)                                              |    │
+│  | - Code quality (25%)                                                |    │
+│  | - Security (20%)                                                    |    │
+│  +---------------------------------------------------------------------+    │
+│       |                                                                     │
+│       v                                                                     │
+│  Output: <system-feedback decision="continue|done">                         │
+│       |                                                                     │
+│       +-- decision="done" -> Clean up, complete                             │
+│       |                                                                     │
+│       +-- decision="continue" AND iteration < max -> Inject prompt, iterate │
+│       |                                                                     │
+│       +-- iteration >= max (default 3) -> Complete with summary             │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**特性：**
+- 温度 0.7，具有创新性，能提出有价值建议
+- 只读权限，保持客观性
+- 自动迭代直到评分 >= 3.5/5 或达到最大迭代次数
+- 支持跳过标签：`skip-system-review`, `quick-fix`, `docs-only`
+
 ---
 
 ## Skills
@@ -341,7 +391,8 @@ opencode-config/
 │       ├── debugger.md
 │       ├── reviewer.md
 │       ├── researcher.md
-│       └── committer.md
+│       ├── committer.md
+│       └── system-engineer.md  # 系统工程师
 ├── command/               # 自定义 Command 定义
 ├── skills/
 │   └── ralph-loop/        # Ralph Loop 技能
@@ -349,7 +400,9 @@ opencode-config/
 │   ├── deep-explore-guide.ts   # 深度探索引导插件
 │   ├── deep-explore-prompts.yaml
 │   ├── ralph.ts                # Ralph Loop 插件
-│   └── task-logger.ts          # 任务自动日志记录插件
+│   ├── task-logger.ts          # 任务自动日志记录插件
+│   ├── system-loop.ts          # 系统工程师迭代插件
+│   └── system-loop-config.yaml # 系统工程师配置
 ├── rules/                 # 补充规则
 │   ├── ascii-diagrams.md
 │   ├── codeact.md
@@ -358,7 +411,8 @@ opencode-config/
 │   ├── checkpoint-system.md # Checkpoint 系统
 │   ├── state-validation.md  # STATE.md 验证
 │   ├── planning-mode.md     # 规划模式
-│   └── execution-mode.md    # 执行模式
+│   ├── execution-mode.md    # 执行模式
+│   └── system-engineer-trigger.md  # 系统工程师触发规则
 └── .planning/             # 项目规划目录（运行时生成）
     ├── PROJECT.md
     ├── REQUIREMENTS.md
