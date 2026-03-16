@@ -2,7 +2,7 @@
 # OpenCode Config Installer
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/USER/REPO/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/huyusong10/opencode-config/main/install.sh | bash
 #   ./install.sh [--link]
 #
 # Modes:
@@ -212,7 +212,7 @@ PYEOF
 }
 
 # Files and directories to install (excluding ref/, .planning/, .worktrees/, caches, etc.)
-INSTALL_ITEMS="AGENTS.md agent command plugin skills tui.json rules opencode.json"
+INSTALL_ITEMS="AGENTS.md agent command plugin skills tui.json rules scripts opencode.json"
 
 # Install
 if [ "$MODE" = "copy" ]; then

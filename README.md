@@ -24,19 +24,6 @@ git clone https://github.com/huyusong10/opencode-config.git ~/opencode-config &&
 git clone https://github.com/huyusong10/opencode-config.git ~/opencode-config && cd ~/opencode-config && ./install.sh --link
 ```
 
-### 手动安装
-
-```bash
-# macOS/Linux - 软链接模式
-git clone https://github.com/huyusong10/opencode-config.git ~/opencode-config && cd ~/opencode-config && ./install.sh
-
-# macOS/Linux - 复制模式
-git clone https://github.com/huyusong10/opencode-config.git ~/opencode-config && cd ~/opencode-config && ./install.sh --copy
-
-# Windows (PowerShell 管理员) - 复制模式
-git clone https://github.com/huyusong10/opencode-config.git $env:USERPROFILE\opencode-config; Copy-Item -Recurse -Force $env:USERPROFILE\opencode-config\* $env:APPDATA\opencode\
-```
-
 ### 更新配置
 
 ```bash
@@ -313,27 +300,41 @@ NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                         Hook Enforcement Layer                               │
+│                     (via composeHooks chaining)                              │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
-│  Hook 1: architect-first-guard                                              │
+│  Hook 1: write-existing-file-guard                                          │
+│  Trigger: Write to existing files                                           │
+│  Check: File must be read before write (per-session tracking)               │
+│  Block: Prevent blind overwrites without prior read                         │
+│                                                                             │
+│  Hook 2: architect-first-guard                                              │
 │  Trigger: Write/Edit source code files                                      │
 │  Check: .planning/STATE.md exists with status = ready                       │
 │  Block: Reject execution without Architect plan                             │
 │                                                                             │
-│  Hook 2: execution-mode-guard                                               │
+│  Hook 3: execution-mode-guard                                               │
 │  Trigger: Same as above                                                     │
 │  Check: execution_mode field exists in STATE.md                             │
 │  Block: Reject execution without specified mode                             │
 │                                                                             │
-│  Hook 3: test-first-guard (TDD mode)                                        │
+│  Hook 4: test-first-guard (TDD mode)                                        │
 │  Trigger: Write implementation in TDD mode                                  │
 │  Check: Corresponding test file exists                                      │
 │  Block: Must write test before implementation                               │
 │                                                                             │
-│  Hook 4: plan-completion-guard                                              │
+│  Hook 5: plan-completion-guard                                              │
 │  Trigger: Mark plan as complete                                             │
 │  Check: All tasks completed + verified                                      │
 │  Block: Reject marking partial work as complete                             │
+│                                                                             │
+│  Hook 6: todo-continuation-enforcer                                         │
+│  Trigger: TodoWrite tool output                                             │
+│  Check: Track incomplete todo items per session                             │
+│                                                                             │
+│  Hook 7: decision-logger                                                    │
+│  Trigger: All tool executions (after)                                       │
+│  Action: Log decisions, tool invocations, and context snapshots             │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -389,7 +390,9 @@ npx tsx scripts/task-logger.ts summary --session abc123
 ```
 opencode-config/
 ├── opencode.json          # 主配置（provider、model、mcp）
+├── tui.json               # TUI 主题配置
 ├── AGENTS.md              # AI 行为偏好
+├── install.sh             # 安装脚本
 ├── agent/
 │   ├── architect.md       # 架构师 Agent
 │   ├── maker.md           # 制造者 Agent
@@ -406,6 +409,10 @@ opencode-config/
 ├── plugin/
 │   ├── guard.ts           # Hook 强制约束插件
 │   └── ralph.ts           # Ralph Loop 插件
+├── rules/                 # 补充规则
+│   ├── ascii-diagrams.md
+│   ├── codeact.md
+│   └── subagent.md
 └── scripts/
     └── task-logger.ts     # 任务日志记录脚本
 ```

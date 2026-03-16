@@ -74,8 +74,6 @@ function parseRalphState(directory: string): RalphState | null {
 function writeRalphState(directory: string, state: RalphState): void {
   const statePath = join(directory, STATE_FILE)
 
-
-
   const completionPromiseYaml =
     state.completionPromise === null ? "null" : `"${state.completionPromise}"`
 

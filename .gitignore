@@ -5,15 +5,25 @@ node_modules/
 
 # Python files:
 __pycache__/
+*.pyc
 
-# Dockman files:
+# Common hidden folders
+.DS_Store
+.claude/
+.ruff_cache/
 .dockman/
+.worktrees/
+.vscode/
+.idea/
+.cursor/
+.aider*
+.codex/
+.env
+.env.*
 
-# Planning logs
-.planning/.logs/
+# Planning state (generated at runtime)
+.planning/
+.ralph/
 
 # Reference
 ref/
-
-# macOS
-.DS_Store

@@ -34,7 +34,7 @@
 
 import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "fs"
 import { dirname, join, extname, basename } from "path"
-import { homedir } from "os"
+
 import { execSync } from "child_process"
 
 // ============================================================================
@@ -633,7 +633,7 @@ function cmdTest(opts: Record<string, string>): void {
   logToSession(entry)
   logToDaily(entry)
 
-  console.log(JSON.stringify({ status: "logged", type: "test_run", status: entry.data.status }))
+  console.log(JSON.stringify({ status: "logged", type: "test_run", testStatus: entry.data.status }))
 }
 
 function cmdCommit(opts: Record<string, string>): void {

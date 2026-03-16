@@ -95,11 +95,7 @@ interface ReadPermissionTracker {
   canonicalSessionRoot: string
 }
 
-interface TodoContinuationState {
-  sessionsWithTodos: Map<string, { todos: string[]; lastCheck: number }>
-  maxConsecutiveFailures: number
-  consecutiveFailures: Map<string, number>
-}
+// TodoContinuationState defined below near its usage (Hook 5)
 
 interface PlannerState {
   status: "planning" | "ready" | "executing" | "completed" | "blocked"
@@ -903,7 +899,7 @@ function inferTestFile(sourcePath: string): string {
   // Normalize path separators
   const normalized = sourcePath.replace(/\\/g, "/")
   const dir = dirname(normalized)
-  const ext = extname(normalized)
+  const ext = getSourceExtname(normalized)
   const base = basename(normalized, ext)
 
   // Priority 1: Same directory with .test.ts or .spec.ts
@@ -925,7 +921,7 @@ function inferTestFile(sourcePath: string): string {
   return sameDirTest
 }
 
-function extname(path: string): string {
+function getSourceExtname(path: string): string {
   const match = path.match(/\.(ts|tsx|js|jsx|py|go|rs|java|rb)$/)
   return match ? match[0] : ""
 }
@@ -1049,9 +1045,9 @@ function createWriteExistingFileGuardHook(ctx: PluginInput, tracker: ReadPermiss
       // Allow new files
       if (!existsSync(resolvedPath)) return
 
-      // Allow .sisyphus/ paths (internal state)
-      const isSisyphusPath = canonicalPath.includes("/.sisyphus/")
-      if (isSisyphusPath) {
+      // Allow .ralph/ paths (internal state)
+      const isRalphPath = canonicalPath.includes("/.ralph/")
+      if (isRalphPath) {
         invalidateOtherSessions(tracker, canonicalPath, input.sessionID)
         return
       }
@@ -1114,8 +1110,8 @@ function createArchitectFirstGuardHook(ctx: PluginInput): Hooks {
       // Skip .planning/ directory (Architect workspace)
       if (resolvedPath.includes("/.planning/")) return
 
-      // Skip .sisyphus/ directory
-      if (resolvedPath.includes("/.sisyphus/")) return
+      // Skip .ralph/ directory
+      if (resolvedPath.includes("/.ralph/")) return
 
       // Skip non-source files
       if (!isSourceFilePath(resolvedPath)) return
@@ -1542,26 +1538,61 @@ function getFilesInScope(ctx: PluginInput): string[] {
 }
 
 // ============================================================================
+// Hook Composer - properly chains multiple hooks without overwriting
+// ============================================================================
+
+function composeHooks(...hooksList: Hooks[]): Hooks {
+  const composed: Hooks = {}
+
+  // Collect all handler names
+  const handlerNames = new Set<string>()
+  for (const hooks of hooksList) {
+    for (const key of Object.keys(hooks)) {
+      handlerNames.add(key)
+    }
+  }
+
+  // For each handler name, create a composed handler that calls all hooks in order
+  for (const name of handlerNames) {
+    const handlers = hooksList
+      .map(h => (h as Record<string, unknown>)[name])
+      .filter((h): h is (...args: unknown[]) => Promise<void> => typeof h === "function")
+
+    if (handlers.length === 0) continue
+
+    ;(composed as Record<string, unknown>)[name] = async (...args: unknown[]) => {
+      for (const handler of handlers) {
+        await handler(...args)
+      }
+    }
+  }
+
+  return composed
+}
+
+// ============================================================================
 // Plugin Export
 // ============================================================================
 
 export const GuardPlugin: Plugin = async (ctx) => {
   const tracker = createReadPermissionTracker(ctx)
 
-  return {
-    // File safety
-    ...createWriteExistingFileGuardHook(ctx, tracker),
+  // Create all hooks as separate objects
+  const writeExistingFileGuard = createWriteExistingFileGuardHook(ctx, tracker)
+  const architectFirstGuard = createArchitectFirstGuardHook(ctx)
+  const planCompletionGuard = createPlanCompletionGuardHook(ctx)
+  const todoContinuationEnforcer = createTodoContinuationEnforcerHook()
+  const decisionLogger = createDecisionLoggerHook(ctx)
 
-    // Workflow enforcement
-    ...createArchitectFirstGuardHook(ctx),
-    ...createPlanCompletionGuardHook(ctx),
-
-    // Continuity
-    ...createTodoContinuationEnforcerHook(),
-
-    // Decision logging
-    ...createDecisionLoggerHook(ctx),
-  }
+  // Compose all hooks: each handler name gets a chained function
+  // that calls all hooks' handlers in order
+  return composeHooks(
+    writeExistingFileGuard,
+    architectFirstGuard,
+    planCompletionGuard,
+    todoContinuationEnforcer,
+    decisionLogger,
+  )
 }
 
 export default GuardPlugin
