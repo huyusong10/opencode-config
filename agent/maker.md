@@ -244,7 +244,7 @@ find .planning/phases -name "*-PLAN.md" -exec grep -L "complete: true" {} \;
 
 ```
 ┌────────────────────────────────────────────────────────────────────┐
-│  WAVE EXECUTION                                                     │
+│  WAVE EXECUTION                                                    │
 ├────────────────────────────────────────────────────────────────────┤
 │                                                                    │
 │  WAVE 1 (parallel)          WAVE 2 (parallel)          WAVE 3      │
@@ -387,28 +387,28 @@ REFACTOR → @reviewer + @coder
 │                     WAVE EXECUTION FLOW                             │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │ FOR each wave IN wave_order:                                │   │
-│  │                                                             │   │
-│  │   plans_in_wave = get_plans_by_wave(wave)                  │   │
-│  │                                                             │   │
-│  │   IF len(plans_in_wave) > 1 AND no_file_conflicts:         │   │
-│  │     → PARALLEL EXECUTION                                    │   │
-│  │     ┌───────────────────────────────────────────────────┐  │   │
-│  │     │ FOR each plan IN plans_in_wave (concurrent):      │  │   │
-│  │     │   dispatch_subagent(plan)                         │  │   │
-│  │     │   wait_for_completion()                            │  │   │
-│  │     └───────────────────────────────────────────────────┘  │   │
-│  │   ELSE:                                                     │   │
-│  │     → SEQUENTIAL EXECUTION                                  │   │
-│  │     FOR each plan IN plans_in_wave:                        │   │
-│  │       execute_plan(plan)                                    │   │
-│  │                                                             │   │
-│  │   WAIT: all plans in wave complete                         │   │
-│  │   VERIFY: wave success criteria                             │   │
-│  │   UPDATE: STATE.md                                          │   │
-│  │                                                             │   │
-│  └─────────────────────────────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │ FOR each wave IN wave_order:                                │    │
+│  │                                                             │    │
+│  │   plans_in_wave = get_plans_by_wave(wave)                  │     │
+│  │                                                             │    │
+│  │   IF len(plans_in_wave) > 1 AND no_file_conflicts:         │     │
+│  │     → PARALLEL EXECUTION                                    │    │
+│  │     ┌───────────────────────────────────────────────────┐  │     │
+│  │     │ FOR each plan IN plans_in_wave (concurrent):      │  │     │
+│  │     │   dispatch_subagent(plan)                         │  │     │
+│  │     │   wait_for_completion()                            │  │    │
+│  │     └───────────────────────────────────────────────────┘  │     │
+│  │   ELSE:                                                     │    │
+│  │     → SEQUENTIAL EXECUTION                                  │    │
+│  │     FOR each plan IN plans_in_wave:                        │     │
+│  │       execute_plan(plan)                                    │    │
+│  │                                                             │    │
+│  │   WAIT: all plans in wave complete                         │     │
+│  │   VERIFY: wave success criteria                             │    │
+│  │   UPDATE: STATE.md                                          │    │
+│  │                                                             │    │
+│  └─────────────────────────────────────────────────────────────┘    │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -532,15 +532,15 @@ update_wave_progress(wave, completed_plans)
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │  Stage 1: Spec Compliance                                   │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │ @reviewer --stage=spec                              │   │
-│  │                                                     │   │
-│  │ Checks:                                             │   │
-│  │ - All planned features implemented?                 │   │
-│  │ - No over-implementation (unplanned features)?      │   │
-│  │ - No under-implementation (missing features)?       │   │
-│  │ - API/file structure matches the plan?              │   │
-│  └─────────────────────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │ @reviewer --stage=spec                              │    │
+│  │                                                     │    │
+│  │ Checks:                                             │    │
+│  │ - All planned features implemented?                 │    │
+│  │ - No over-implementation (unplanned features)?      │    │
+│  │ - No under-implementation (missing features)?       │    │
+│  │ - API/file structure matches the plan?              │    │
+│  └─────────────────────────────────────────────────────┘    │
 │                         │                                   │
 │                         ▼                                   │
 │              ┌─────────────────────┐                        │
@@ -556,16 +556,16 @@ update_wave_progress(wave, completed_plans)
 │                   │                                         │
 │                   ▼                                         │
 │  Stage 2: Code Quality                                      │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │ @reviewer --stage=quality                           │   │
-│  │                                                     │   │
-│  │ Checks:                                             │   │
-│  │ - Code style consistent?                            │   │
-│  │ - Naming clear?                                     │   │
-│  │ - Error handling complete?                          │   │
-│  │ - Security checks passed?                           │   │
-│  │ - No duplicate code?                                │   │
-│  └─────────────────────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │ @reviewer --stage=quality                           │    │
+│  │                                                     │    │
+│  │ Checks:                                             │    │
+│  │ - Code style consistent?                            │    │
+│  │ - Naming clear?                                     │    │
+│  │ - Error handling complete?                          │    │
+│  │ - Security checks passed?                           │    │
+│  │ - No duplicate code?                                │    │
+│  └─────────────────────────────────────────────────────┘    │
 │                         │                                   │
 │                         ▼                                   │
 │              ┌─────────────────────┐                        │
@@ -953,41 +953,41 @@ Checkpoint 用于验证自动化之后，而非替代自动化。
 │  └─────────────────────┘                                            │
 │       │                                                             │
 │       ├── human-verify ──────────────────────────────────┐          │
-│       │   1. Ensure automation is complete                │          │
-│       │   2. Provide verification steps                   │          │
-│       │   3. Wait for user confirmation                   │          │
-│       │                                                   ▼          │
+│       │   1. Ensure automation is complete                │         │
+│       │   2. Provide verification steps                   │         │
+│       │   3. Wait for user confirmation                   │         │
+│       │                                                   ▼         │
 │       │                                          ┌────────────────┐ │
 │       │                                          │ User: "Pass"   │ │
 │       │                                          │ or describe    │ │
 │       │                                          └────────────────┘ │
-│       │                                                   │          │
-│       ├── decision ─────────────────────────────────────┐          │
+│       │                                                   │         │
+│       ├── decision ─────────────────────────────────────┐           │
 │       │   1. Provide options table                       │          │
 │       │   2. Wait for user choice                        │          │
 │       │   3. Continue per selection                      ▼          │
 │       │                                          ┌────────────────┐ │
 │       │                                          │ User: "A"      │ │
 │       │                                          └────────────────┘ │
-│       │                                                   │          │
-│       ├── human-action ─────────────────────────────────┐          │
+│       │                                                   │         │
+│       ├── human-action ─────────────────────────────────┐           │
 │       │   1. Describe what needs to be done              │          │
 │       │   2. Provide verification command                │          │
 │       │   3. Wait for user to complete                   ▼          │
 │       │                                          ┌────────────────┐ │
 │       │                                          │ User: "Done"   │ │
 │       │                                          └────────────────┘ │
-│       │                                                   │          │
+│       │                                                   │         │
 │       └── auth-gate ─────────────────────────────────────┐          │
-│           1. Identify required credentials                │          │
-│           2. Provide steps to obtain them                 │          │
-│           3. Wait for user configuration                  ▼          │
+│           1. Identify required credentials                │         │
+│           2. Provide steps to obtain them                 │         │
+│           3. Wait for user configuration                  ▼         │
 │                                                  ┌────────────────┐ │
-│                                                  │ User: Configured│ │
+│                                                  │ User: Configured││
 │                                                  └────────────────┘ │
-│                                                           │          │
-│                                                           ▼          │
-│                                                    Resume execution  │
+│                                                           │         │
+│                                                           ▼         │
+│                                                    Resume execution │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -1147,7 +1147,7 @@ Checkpoint 用于验证自动化之后，而非替代自动化。
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Plan Completion Checklist                 │
+│                    Plan Completion Checklist                │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │  □ All tasks marked [x] complete                            │
@@ -1211,56 +1211,56 @@ Checkpoint 用于验证自动化之后，而非替代自动化。
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    ATDD Feature-Level TDD                    │
+│                    ATDD Feature-Level TDD                   │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
-│  Step 1: Analyze Feature Requirements                        │
-│  ┌─────────────────────────────────────────────────────┐   │
+│  Step 1: Analyze Feature Requirements                       │
+│  ┌─────────────────────────────────────────────────────┐    │
 │  │ Extract task requirements from PLAN.md               │   │
 │  │ Identify acceptance criteria                         │   │
-│  └─────────────────────────────────────────────────────┘   │
+│  └─────────────────────────────────────────────────────┘    │
 │                         │                                   │
 │                         ▼                                   │
-│  Step 2: Infer Test File Location                            │
-│  ┌─────────────────────────────────────────────────────┐   │
+│  Step 2: Infer Test File Location                           │
+│  ┌─────────────────────────────────────────────────────┐    │
 │  │ Impl file: src/auth/login.ts                         │   │
 │  │ Test files (priority order):                         │   │
 │  │   1. src/auth/login.test.ts  (same dir .test.ts)     │   │
 │  │   2. src/auth/login.spec.ts  (same dir .spec.ts)     │   │
 │  │   3. src/auth/__tests__/login.ts (subdir)            │   │
 │  │   4. tests/auth/login.test.ts (centralized dir)      │   │
-│  └─────────────────────────────────────────────────────┘   │
+│  └─────────────────────────────────────────────────────┘    │
 │                         │                                   │
 │                         ▼                                   │
-│  Step 3: RED - Write Failing Tests                           │
-│  ┌─────────────────────────────────────────────────────┐   │
+│  Step 3: RED - Write Failing Tests                          │
+│  ┌─────────────────────────────────────────────────────┐    │
 │  │ Create test file (Hook requires this first)          │   │
 │  │ Write acceptance test cases                          │   │
 │  │ Run tests → confirm they fail                        │   │
-│  └─────────────────────────────────────────────────────┘   │
+│  └─────────────────────────────────────────────────────┘    │
 │                         │                                   │
 │                         ▼                                   │
-│  Step 4: GREEN - Minimal Implementation                      │
-│  ┌─────────────────────────────────────────────────────┐   │
+│  Step 4: GREEN - Minimal Implementation                     │
+│  ┌─────────────────────────────────────────────────────┐    │
 │  │ Create/modify implementation file                    │   │
 │  │ Write only enough code to pass tests                 │   │
 │  │ Run tests → confirm they pass                        │   │
-│  └─────────────────────────────────────────────────────┘   │
+│  └─────────────────────────────────────────────────────┘    │
 │                         │                                   │
 │                         ▼                                   │
-│  Step 5: REFACTOR - Optimize                                 │
-│  ┌─────────────────────────────────────────────────────┐   │
+│  Step 5: REFACTOR - Optimize                                │
+│  ┌─────────────────────────────────────────────────────┐    │
 │  │ Refactor under test protection                       │   │
 │  │ Keep tests passing                                   │   │
 │  │ @reviewer reviews code quality                       │   │
-│  └─────────────────────────────────────────────────────┘   │
+│  └─────────────────────────────────────────────────────┘    │
 │                         │                                   │
 │                         ▼                                   │
-│  Step 6: Commit Task                                         │
-│  ┌─────────────────────────────────────────────────────┐   │
+│  Step 6: Commit Task                                        │
+│  ┌─────────────────────────────────────────────────────┐    │
 │  │ Update PLAN.md task status: [ ] → [x]                │   │
 │  │ @committer commits code                              │   │
-│  └─────────────────────────────────────────────────────┘   │
+│  └─────────────────────────────────────────────────────┘    │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```

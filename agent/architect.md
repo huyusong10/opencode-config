@@ -144,59 +144,59 @@ cat pyproject.toml 2>/dev/null | head -30
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │  Step 1: State the Goal                                     │
-│  ┌─────────────────────────────────────────────────────┐   │
+│  ┌─────────────────────────────────────────────────────┐    │
 │  │ Extract phase goal from ROADMAP.md                   │   │
 │  │ Must be outcome-oriented, not task-oriented          │   │
 │  │ Good: "working chat interface" (outcome)             │   │
 │  │ Bad:  "build chat component"   (task)                │   │
-│  └─────────────────────────────────────────────────────┘   │
+│  └─────────────────────────────────────────────────────┘    │
 │                         ↓                                   │
 │  Step 2: Derive Observable Truths                           │
-│  ┌─────────────────────────────────────────────────────┐   │
+│  ┌─────────────────────────────────────────────────────┐    │
 │  │ Question: "For the goal to be met, what must be true?"│  │
 │  │ List 3-7 user-verifiable behaviors                   │   │
-│  │                                                       │   │
-│  │ Example (chat interface):                             │   │
-│  │ - User can see existing messages                      │   │
-│  │ - User can type a new message                         │   │
-│  │ - User can send a message                             │   │
-│  │ - Sent messages appear in the list                    │   │
-│  │ - Messages persist across refresh                     │   │
-│  └─────────────────────────────────────────────────────┘   │
+│  │                                                       │  │
+│  │ Example (chat interface):                             │  │
+│  │ - User can see existing messages                      │  │
+│  │ - User can type a new message                         │  │
+│  │ - User can send a message                             │  │
+│  │ - Sent messages appear in the list                    │  │
+│  │ - Messages persist across refresh                     │  │
+│  └─────────────────────────────────────────────────────┘    │
 │                         ↓                                   │
 │  Step 3: Derive Required Artifacts                          │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │ For each truth ask: "What must exist for this?"       │   │
-│  │                                                       │   │
-│  │ "User can see messages" requires:                     │   │
-│  │ - Message list component (renders Message[])          │   │
-│  │ - Message state (loaded from somewhere)               │   │
-│  │ - API route or data source (provides messages)        │   │
-│  │ - Message type definition (data shape)                │   │
-│  └─────────────────────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │ For each truth ask: "What must exist for this?"       │  │
+│  │                                                       │  │
+│  │ "User can see messages" requires:                     │  │
+│  │ - Message list component (renders Message[])          │  │
+│  │ - Message state (loaded from somewhere)               │  │
+│  │ - API route or data source (provides messages)        │  │
+│  │ - Message type definition (data shape)                │  │
+│  └─────────────────────────────────────────────────────┘    │
 │                         ↓                                   │
 │  Step 4: Derive Required Connections                        │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │ For each artifact ask: "What must connect for this?"  │   │
-│  │                                                       │   │
-│  │ Message list component connections:                   │   │
-│  │ - Imports Message type (not any)                      │   │
-│  │ - Receives messages prop or fetches from API          │   │
-│  │ - Iterates messages to render (not hardcoded)         │   │
-│  │ - Handles empty state (does not just crash)           │   │
-│  └─────────────────────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │ For each artifact ask: "What must connect for this?"  │  │
+│  │                                                       │  │
+│  │ Message list component connections:                   │  │
+│  │ - Imports Message type (not any)                      │  │
+│  │ - Receives messages prop or fetches from API          │  │
+│  │ - Iterates messages to render (not hardcoded)         │  │
+│  │ - Handles empty state (does not just crash)           │  │
+│  └─────────────────────────────────────────────────────┘    │
 │                         ↓                                   │
 │  Step 5: Identify Critical Links                            │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │ Question: "Where is failure most likely?"             │   │
-│  │ Critical link = connection whose breakage causes      │   │
-│  │ cascading failures                                    │   │
-│  │                                                       │   │
-│  │ Chat interface critical links:                        │   │
-│  │ - Input onSubmit → API (broken: can type/not send)    │   │
-│  │ - API save → DB (broken: appears sent but not persist)│   │
-│  │ - Component → real data (broken: shows placeholder)   │   │
-│  └─────────────────────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │ Question: "Where is failure most likely?"             │  │
+│  │ Critical link = connection whose breakage causes      │  │
+│  │ cascading failures                                    │  │
+│  │                                                       │  │
+│  │ Chat interface critical links:                        │  │
+│  │ - Input onSubmit → API (broken: can type/not send)    │  │
+│  │ - API save → DB (broken: appears sent but not persist)│  │
+│  │ - Component → real data (broken: shows placeholder)   │  │
+│  └─────────────────────────────────────────────────────┘    │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -721,7 +721,7 @@ execution_mode: [mode]     # 必填: tdd | ralph | standard | spike | debug | re
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│              execution_mode Selection Tree                   │
+│              execution_mode Selection Tree                  │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │  New feature development?                                   │
