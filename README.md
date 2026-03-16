@@ -38,9 +38,9 @@ cd ~/opencode-config && git pull
 
 ## 核心架构
 
-### Builder Agent（推荐）
+### Maestro Agent（推荐）
 
-**一键式调用：** 使用 `@builder` 完成从规划到执行的全流程，无需手动切换 agent。
+**一键式调用：** 使用 `@maestro` 完成从规划到执行的全流程，无需手动切换 agent。
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -49,12 +49,16 @@ cd ~/opencode-config && git pull
                                        │
                                        ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                           Builder                                           │
+│                           Maestro                                           │
 │                                                                             │
 │  State-Driven: 自动检测 STATE.md status 决定模式                            │
 │  - .planning/ 不存在 → Planning Mode (创建规划)                             │
 │  - status: ready → Execution Mode (执行计划)                                │
 │  - status: in_progress → Resume Mode (恢复中断)                             │
+│                                                                             │
+│  温度 0.35 平衡创造力与确定性:                                               │
+│  - Planning Mode: 创造性探索，广泛发散                                       │
+│  - Execution Mode: 确定性执行，严格验证                                     │
 │                                                                             │
 │  Delegates: @coder, @tester, @debugger, @reviewer, @researcher, @committer  │
 └─────────────────────────────────────────────────────────────────────────────┘
