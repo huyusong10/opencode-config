@@ -1,0 +1,178 @@
+# Deep Explore Guidance Prompts
+# =================================
+#
+# This plugin injects guidance prompts when tool operations fail,
+# encouraging deeper investigation rather than skipping errors.
+#
+# Philosophy: Guide, don't force. Let AI decide the action.
+
+# Plugin enabled?
+enabled: true
+
+# Maximum guidance injections per session (0 = unlimited)
+max_injections: 0
+
+# ─────────────────────────────────────────────────────────────
+# FAILURE GUIDANCE
+# ─────────────────────────────────────────────────────────────
+
+# Triggered on first failure of a tool
+first_failure:
+  template: |
+    ---
+
+    ## Investigate Before Retrying
+
+    The `{tool}` operation failed.
+
+    **DO NOT immediately retry the same operation.**
+
+    {tool_tips}
+
+    ### Approach
+
+    1. Understand what went wrong
+    2. Verify your assumptions
+    3. Form a hypothesis
+    4. Test before fixing
+
+    ---
+
+# Triggered when same tool fails multiple times
+multiple_failures:
+  threshold: 2
+  template: |
+    ---
+
+    ## Multiple Failures
+
+    `{tool}` has failed {count} times.
+
+    **You may be missing something fundamental.**
+
+    Ask yourself:
+    - Is there a prerequisite I haven't checked?
+    - Is there a file I should read first?
+    - Should I try a different approach?
+
+    ---
+
+# Triggered when same error repeats
+repetition:
+  threshold: 3
+  template: |
+    ---
+
+    ## Repeated Failure
+
+    Same error occurred {count} times.
+
+    **Stop and reconsider your approach.**
+
+    Options:
+    - Read more context
+    - Try a different method
+    - Ask for clarification
+
+    ---
+
+# Tool-specific tips (injected into first_failure template)
+tool_tips:
+  bash: |
+    For command failures:
+    - Read error message completely
+    - Check if command/dependency exists
+
+  edit: |
+    For edit failures:
+    - Verify oldString matches exactly
+    - Read the file first
+
+  write: |
+    For write failures:
+    - Check directory exists
+    - Verify permissions
+
+  read: |
+    For read failures:
+    - Verify file path is correct
+    - Check if file exists
+
+  glob: |
+    For glob failures:
+    - Verify pattern syntax
+    - Check if directory exists
+
+  grep: |
+    For grep failures:
+    - Verify regex pattern
+    - Check file patterns
+
+  pty_spawn: |
+    For process failures:
+    - Check if command exists
+    - Verify arguments
+
+  default: |
+    Read the error carefully and check assumptions.
+
+# ─────────────────────────────────────────────────────────────
+# SUCCESS GUIDANCE (Optional)
+# ─────────────────────────────────────────────────────────────
+
+# Enable guidance on successful operations?
+success_guidance:
+  enabled: false
+
+  # Which tools to provide success guidance for
+  tools:
+    - write
+    - edit
+
+  template: |
+    ---
+
+    ## Quick Quality Check
+
+    The `{tool}` succeeded. Before moving on:
+
+    - Does the implementation match the spec?
+    - Are edge cases handled?
+    - Should tests be updated?
+
+    ---
+
+# ─────────────────────────────────────────────────────────────
+# DEBUGGER HINT
+# ─────────────────────────────────────────────────────────────
+
+# When verification commands fail, suggest calling @debugger
+debugger_hint:
+  enabled: true
+
+  # Commands that are considered "verification"
+  verification_patterns:
+    - "npm test"
+    - "npm run test"
+    - "pytest"
+    - "cargo test"
+    - "go test"
+    - "npm run lint"
+    - "npm run build"
+    - "tsc"
+    - "ruff"
+    - "mypy"
+
+  template: |
+    ---
+
+    ## Verification Failed
+
+    Consider using `@debugger` to investigate:
+
+    ```
+    @debugger
+    Analyze why this verification failed and propose a fix.
+    ```
+
+    ---

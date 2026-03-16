@@ -384,6 +384,7 @@
     "opencode-pty@latest",
     "./plugin/guard.ts",
     "./plugin/task-logger.ts",
+    "./plugin/deep-explore-guide.ts",
     "opencode-worktree@latest"
   ],
   "instructions": [
