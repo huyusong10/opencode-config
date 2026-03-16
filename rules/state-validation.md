@@ -6,17 +6,25 @@ Before reading or updating STATE.md, validate required fields.
 
 | Field | Valid Values | Validation |
 |-------|-------------|------------|
-| `阶段` / `current_phase` | Phase identifier | Must match an existing `.planning/phases/` directory |
-| `计划` / `current_plan` | Plan identifier | Must reference an existing PLAN.md or archived PLAN.md |
-| `状态` / `status` | `ready`, `in_progress`, `completed`, `blocked` | Must be one of these four values |
+| `阶段` / `current_phase` | Phase identifier | Must match an existing `.planning/phases/` directory (empty during planning) |
+| `计划` / `current_plan` | Plan identifier | Must reference an existing PLAN.md or archived PLAN.md (empty during planning) |
+| `状态` / `status` | `planning`, `ready`, `in_progress`, `completed`, `blocked` | Must be one of these values |
 | `最后活动` / `last_activity` | ISO timestamp | Must be parseable as a valid date |
+
+### Status Lifecycle
+
+```
+planning → ready → in_progress → completed → (next phase: ready or done)
+                ↑                ↓
+            blocked ←───────────┘
+```
 
 ### Validation Failure
 
 If any field fails validation:
 1. Report the specific field and actual value
-2. Stop execution immediately
-3. Wait for user to fix the inconsistency
+2. Suggest: delete `.planning/` to restart, or manually fix the issue
+3. Stop execution, wait for user decision
 
 ### Inconsistency Detection
 

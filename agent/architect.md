@@ -332,9 +332,16 @@ mkdir -p .planning/phases
 ## 当前位置
 - 阶段: 1 / N
 - 计划: 1 / M
-- 状态: 准备执行 | 进行中 | 已完成 | 阻塞
+- 状态: planning | ready | in_progress | completed | blocked
 - 最后活动: [时间戳]
 - 停止于: [最后完成的计划/任务]
+
+**状态说明：**
+- `planning` - 正在规划中
+- `ready` - 规划完成，准备执行
+- `in_progress` - 执行中
+- `completed` - 当前阶段完成
+- `blocked` - 遇到阻塞
 
 ## 进度
 [░░░░░░░░░░] 0% (0/N 阶段完成)

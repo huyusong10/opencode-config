@@ -48,14 +48,22 @@ tools:
 │     └── Yes → Read STATE.md                                     │
 │                                                                 │
 │  2. Check STATE.md status                                       │
-│     ├── 不存在或 "planning" → PLANNING MODE                     │
+│     ├── 不存在或非法值 → PLANNING MODE (修复或重建)             │
+│     ├── "planning" → PLANNING MODE (继续规划)                   │
 │     ├── "ready" → EXECUTION MODE (开始执行)                     │
 │     ├── "in_progress" → EXECUTION MODE (继续执行/恢复)          │
-│     ├── "completed" → ARCHIVE MODE (归档后检查下一计划)         │
-│     └── "blocked" → Review blocker, resolve or report          │
+│     ├── "completed" → 检查下一阶段 → 有则 ready，无则报告完成   │
+│     └── "blocked" → 报告阻塞项，等待用户处理                    │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+### 状态验证失败处理
+
+如果 STATE.md 格式损坏或 status 为非法值：
+1. 报告具体问题（缺少字段/非法值/文件不存在）
+2. 建议：删除 `.planning/` 重新开始，或手动修复
+3. 等待用户决策
 
 ---
 
@@ -138,18 +146,20 @@ tools:
 
 ---
 
-## ARCHIVE MODE
+## 归档与阶段推进
 
-**触发条件：** STATE.md status = `completed`
-
-**职责：** 归档完成、检查下一计划
+**触发条件：** Execution Mode 中所有任务完成
 
 ### 流程
 
-1. 确认当前计划已归档（PLAN.md 在 archive/，有 SUMMARY.md）
-2. 检查 ROADMAP.md 是否有下一阶段
-3. 有下一阶段 → 更新 STATE.md 指向新阶段，status = `ready`
-4. 无下一阶段 → 报告项目完成
+1. 创建 SUMMARY.md，记录执行摘要
+2. 移动 PLAN.md 到 `archive/`
+3. 更新 STATE.md status = `completed`
+4. **立即检查 ROADMAP.md 是否有下一阶段**
+5. 有下一阶段 → 更新 STATE.md 指向新阶段，status = `ready`，报告进度
+6. 无下一阶段 → 报告项目完成
+
+**注意：** 归档和阶段推进在 Execution Mode 中一次性完成，无需单独 ARCHIVE MODE。
 
 ---
 
@@ -188,9 +198,14 @@ tools:
 
 参见 `rules/state-validation.md`
 
-**必需字段：**
-- `status` - 必须是 `planning` | `ready` | `in_progress` | `completed` | `blocked`
-- `阶段` / `计划` - 必须对应已存在的文件
+**Status 取值：**
+- `planning` - 正在规划中
+- `ready` - 规划完成，准备执行
+- `in_progress` - 执行中
+- `completed` - 当前阶段完成
+- `blocked` - 遇到阻塞
+
+**必需字段：** `status`, `阶段`, `计划`
 
 ---
 
