@@ -293,66 +293,6 @@ NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST
 
 ---
 
-## Hook 强制约束
-
-采用 Hook 机制强制执行工作流程规范，无法绕过：
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         Hook Enforcement Layer                              │
-│                     (via composeHooks chaining)                             │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  Hook 1: write-existing-file-guard                                          │
-│  Trigger: Write to existing files                                           │
-│  Check: File must be read before write (per-session tracking)               │
-│  Block: Prevent blind overwrites without prior read                         │
-│                                                                             │
-│  Hook 2: architect-first-guard                                              │
-│  Trigger: Write/Edit source code files                                      │
-│  Check: .planning/STATE.md exists with status = ready                       │
-│  Block: Reject execution without Architect plan                             │
-│                                                                             │
-│  Hook 3: execution-mode-guard                                               │
-│  Trigger: Same as above                                                     │
-│  Check: execution_mode field exists in STATE.md                             │
-│  Block: Reject execution without specified mode                             │
-│                                                                             │
-│  Hook 4: test-first-guard (TDD mode)                                        │
-│  Trigger: Write implementation in TDD mode                                  │
-│  Check: Corresponding test file exists                                      │
-│  Block: Must write test before implementation                               │
-│                                                                             │
-│  Hook 5: plan-completion-guard                                              │
-│  Trigger: Mark plan as complete                                             │
-│  Check: All tasks completed + verified                                      │
-│  Block: Reject marking partial work as complete                             │
-│                                                                             │
-│  Hook 6: todo-continuation-enforcer                                         │
-│  Trigger: TodoWrite tool output                                             │
-│  Check: Track incomplete todo items per session                             │
-│                                                                             │
-│  Hook 7: decision-logger                                                    │
-│  Trigger: All tool executions (after)                                       │
-│  Action: Log decisions, tool invocations, and context snapshots             │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-### STATE.md 必填字段
-
-```yaml
-## 当前位置
-阶段: [phase-id]           # 必填
-计划: [plan-id]            # 必填
-状态: ready                 # 必填: ready 才能执行
-
-## 执行模式（必填）
-execution_mode: tdd        # 必填: tdd | ralph | standard | debug | refactor | migrate
-```
-
----
-
 ## 任务日志系统
 
 每个任务执行自动记录日志，用于复盘和优化：
@@ -400,9 +340,10 @@ opencode-config/
 ├── skills/
 │   └── ralph-loop/        # Ralph Loop 技能
 ├── plugin/
-│   ├── guard.ts           # Hook 强制约束插件
-│   ├── ralph.ts           # Ralph Loop 插件
-│   └── task-logger.ts     # 任务自动日志记录插件
+│   ├── deep-explore-guide.ts   # 深度探索引导插件
+│   ├── deep-explore-prompts.yaml
+│   ├── ralph.ts                # Ralph Loop 插件
+│   └── task-logger.ts          # 任务自动日志记录插件
 ├── rules/                 # 补充规则
 │   ├── ascii-diagrams.md
 │   ├── codeact.md

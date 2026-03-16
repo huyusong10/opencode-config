@@ -27,8 +27,6 @@ tools:
 
 将计划转化为可运行的代码。你协调执行过程，跟踪进度，并通过验证确保质量。
 
-**注意：** Hook 系统会强制执行工作流程约束（规划先行、TDD 顺序等）。如果 Hook 阻止操作，阅读错误消息并按要求处理。
-
 ---
 
 ## 关键职责
@@ -88,26 +86,15 @@ tools:
 | `task_complete` | 任务完成 | 任务提交后 |
 | `test_run` | 测试运行 | 运行测试 |
 | `commit` | Git提交 | 代码提交 |
-| `hook_block` | Hook阻止 | Hook拦截操作 |
-| `hook_pass` | Hook通过 | Hook验证通过 |
 | `error` | 错误 | 发生错误 |
 | `checkpoint` | 检查点 | 到达checkpoint |
 | `archive` | 归档 | Plan归档 |
-
-### Hook自动记录
-
-Hook拦截事件会自动记录到日志：
-
-- `architect-first-guard` 阻止 → 记录 `hook_block`
-- `test-first-guard` 阻止 → 记录 `hook_block`
-- `plan-completion-guard` 阻止 → 记录 `hook_block`
 
 ### 日志用途
 
 1. **复盘分析** - 回顾执行过程，找出瓶颈
 2. **性能优化** - 分析任务耗时，优化流程
-3. **Hook调优** - 统计Hook阻止频率，调整规则
-4. **Agent改进** - 基于实际执行数据优化Agent行为
+3. **Agent改进** - 基于实际执行数据优化Agent行为
 
 ---
 
@@ -992,7 +979,6 @@ Checkpoint 用于验证自动化之后，而非替代自动化。
 │  □ All tasks marked [x] complete                            │
 │  □ All verification commands passed                         │
 │  □ All success criteria met                                 │
-│  □ Hook: plan-completion-guard verified                     │
 │  □ SUMMARY.md created                                       │
 │  □ PLAN.md moved to archive/                                │
 │  □ STATE.md updated                                         │
@@ -1104,24 +1090,9 @@ Checkpoint 用于验证自动化之后，而非替代自动化。
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Hook 强制检查
-
-**test-first-guard 会阻止你先写实现文件：**
-
-```
-如果尝试先创建 src/auth/login.ts 而测试文件不存在：
-
-⛔ BLOCKED: TDD Violation - Write Test First
-
-Target file: src/auth/login.ts
-Required test: src/auth/login.test.ts
-
-Create the test file first!
-```
-
 ### TDD 铁律
 
-- **先写失败测试，再实现代码** (Hook强制)
+- **先写失败测试，再实现代码**
 - 测试必须先失败（证明测试有效）
 - 实现最小化（只让测试通过，不多写）
 - 重构不改变行为（测试持续通过）
@@ -1142,9 +1113,6 @@ Create the test file first!
     │
     ▼
 更新 PLAN.md frontmatter: status: completed
-    │
-    ▼
-Hook: plan-completion-guard 验证
     │
     ▼
 创建 SUMMARY.md

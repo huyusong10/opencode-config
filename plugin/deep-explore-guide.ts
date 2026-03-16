@@ -36,7 +36,6 @@ interface DebuggerHintConfig {
 }
 
 interface Config {
-  enabled: boolean
   max_injections: number
   first_failure: FailureGuidanceConfig
   multiple_failures: FailureGuidanceConfig
@@ -82,7 +81,6 @@ function cleanupSession(sessionId: string): void {
 
 function defaultConfig(): Config {
   return {
-    enabled: true,
     max_injections: 0,
     first_failure: {
       template: `
@@ -197,11 +195,6 @@ export const DeepExploreGuidePlugin: Plugin = async ({ directory, client }) => {
 
   // Load configuration
   const config = loadConfig(pluginDir)
-
-  if (!config.enabled) {
-    console.log("[deep-explore-guide] Plugin disabled via config")
-    return {}
-  }
 
   console.log("[deep-explore-guide] Plugin initialized")
 
