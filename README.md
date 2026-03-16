@@ -368,19 +368,12 @@ execution_mode: tdd        # 必填: tdd | ralph | standard | debug | refactor |
 
 ### 使用方式
 
-```bash
-# 记录任务开始
-npx tsx scripts/task-logger.ts task-start \
-  --session abc123 --phase 01-foundation --plan 01-01 \
-  --task "Task 1: Create auth types"
+现在作为 Opencode 插件自动执行。在 `opencode.json` 中配置即可：
 
-# 记录任务完成
-npx tsx scripts/task-logger.ts complete \
-  --session abc123 --task "Task 1" \
-  --files "src/types/auth.ts" --duration 300000
-
-# 生成会话摘要
-npx tsx scripts/task-logger.ts summary --session abc123
+```json
+  "plugin": [
+    "./plugin/task-logger.ts"
+  ]
 ```
 
 ---
@@ -408,13 +401,12 @@ opencode-config/
 │   └── ralph-loop/        # Ralph Loop 技能
 ├── plugin/
 │   ├── guard.ts           # Hook 强制约束插件
-│   └── ralph.ts           # Ralph Loop 插件
+│   ├── ralph.ts           # Ralph Loop 插件
+│   └── task-logger.ts     # 任务自动日志记录插件
 ├── rules/                 # 补充规则
 │   ├── ascii-diagrams.md
 │   ├── codeact.md
 │   └── subagent.md
-└── scripts/
-    └── task-logger.ts     # 任务日志记录脚本
 ```
 
 ---

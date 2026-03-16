@@ -144,40 +144,6 @@ This operation modifies source code and requires prior planning.
 | `checkpoint` | 检查点 | 到达checkpoint |
 | `archive` | 归档 | Plan归档 |
 
-### 手动记录日志
-
-使用 `scripts/task-logger.ts` 脚本：
-
-```bash
-# 任务开始
-npx tsx scripts/task-logger.ts task-start \
-  --session [session-id] \
-  --phase 01-foundation \
-  --plan 01-01 \
-  --task "Task 1: Create auth types"
-
-# 任务完成
-npx tsx scripts/task-logger.ts complete \
-  --session [session-id] \
-  --phase 01-foundation \
-  --plan 01-01 \
-  --task "Task 1: Create auth types" \
-  --files "src/types/auth.ts,src/types/auth.test.ts" \
-  --duration 300000 \
-  --commit abc123
-
-# 测试运行
-npx tsx scripts/task-logger.ts test \
-  --session [session-id] \
-  --files "src/auth/login.test.ts" \
-  --status pass \
-  --passed 5 \
-  --failed 0
-
-# 生成会话摘要
-npx tsx scripts/task-logger.ts summary --session [session-id]
-```
-
 ### Hook自动记录
 
 Hook拦截事件会自动记录到日志：

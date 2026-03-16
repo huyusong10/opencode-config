@@ -383,6 +383,7 @@
     "@mohak34/opencode-notifier@latest",
     "opencode-pty@latest",
     "./plugin/guard.ts",
+    "./plugin/task-logger.ts",
     "opencode-worktree@latest"
   ],
   "instructions": [
