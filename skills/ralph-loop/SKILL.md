@@ -137,23 +137,18 @@ Ralph Loop 的核心目标是"持续迭代直到真正完成"，但实际上经�
 │       │                                                         │
 │       ▼                                                         │
 │  ┌─────────────────────────────────────────┐                    │
-│  │         @architect (Planning Agent)     │                    │
+│  │         @maestro (Unified Agent)        │                    │
 │  │                                         │                    │
+│  │  Planning Mode:                         │                    │
 │  │  1. Explore and clarify requirements    │                    │
 │  │  2. Recommend mode (default: ralph)     │                    │
 │  │  3. Create .planning/ or .ralph/ dir    │                    │
 │  │  4. Define completion promise           │                    │
-│  └─────────────────────────────────────────┘                    │
-│       │                                                         │
-│       ▼                                                         │
-│  ┌─────────────────────────────────────────┐                    │
-│  │         @maker (Execution Agent)        │                    │
 │  │                                         │                    │
+│  │  Execution Mode:                        │                    │
 │  │  while (iteration < max_iterations &&   │                    │
 │  │         !completion_promise_met):       │                    │
-│  │                                         │                    │
 │  │    @coder → @tester → @debugger Loop    │                    │
-│  │                                         │                    │
 │  └─────────────────────────────────────────┘                    │
 │       │                                                         │
 │       ▼                                                         │
@@ -279,6 +274,14 @@ Ralph Loop 的核心目标是"持续迭代直到真正完成"，但实际上经�
 
 ### 1. 启动规划
 
+**推荐方式：**
+```
+@maestro
+```
+
+Maestro 会自动进入 Planning Mode，完成后确认进入 Execution Mode。
+
+**向后兼容：**
 ```
 @architect
 ```
@@ -289,18 +292,24 @@ Ralph Loop 的核心目标是"持续迭代直到真正完成"，但实际上经�
 /ralph-loop [任务描述]
 ```
 
-### 2. Architect 规划
+### 2. Maestro/Architect 规划
 
-Architect 会引导你：
+Maestro/Architect 会引导你：
 1. 明确需求
 2. 推荐执行模式（默认 ralph）
 3. 创建规划文件
 4. 定义完成承诺
 5. 确认启动
 
-### 3. Maker 执行
+### 3. Maestro/Maker 执行
 
-确认后，Maker 以 ralph 模式执行：
+确认后，Maestro/Maker 以 ralph 模式执行：
+
+```
+@maestro
+```
+
+或向后兼容：
 
 ```
 @maker
