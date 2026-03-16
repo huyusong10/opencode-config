@@ -130,29 +130,29 @@ Ralph Loop 的核心目标是"持续迭代直到真正完成"，但实际上经�
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                     RALPH LOOP 系统架构                         │
+│                     RALPH LOOP SYSTEM ARCHITECTURE              │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│   用户请求                                                      │
+│   User Request                                                  │
 │       │                                                         │
 │       ▼                                                         │
 │  ┌─────────────────────────────────────────┐                    │
-│  │         @architect (规划代理)            │                   │
+│  │         @architect (Planning Agent)     │                    │
 │  │                                         │                    │
-│  │  1. 需求探索与澄清                       │                   │
-│  │  2. 推荐执行模式 (默认: ralph)           │                   │
-│  │  3. 创建 .planning/ 或 .ralph/ 目录      │                   │
-│  │  4. 定义完成承诺                         │                   │
+│  │  1. Explore and clarify requirements    │                    │
+│  │  2. Recommend mode (default: ralph)     │                    │
+│  │  3. Create .planning/ or .ralph/ dir    │                    │
+│  │  4. Define completion promise           │                    │
 │  └─────────────────────────────────────────┘                    │
 │       │                                                         │
 │       ▼                                                         │
 │  ┌─────────────────────────────────────────┐                    │
-│  │         @maker (执行代理)                │                   │
+│  │         @maker (Execution Agent)        │                    │
 │  │                                         │                    │
 │  │  while (iteration < max_iterations &&   │                    │
 │  │         !completion_promise_met):       │                    │
 │  │                                         │                    │
-│  │    @coder → @tester → @debugger 循环    │                    │
+│  │    @coder → @tester → @debugger Loop    │                    │
 │  │                                         │                    │
 │  └─────────────────────────────────────────┘                    │
 │       │                                                         │
@@ -160,13 +160,13 @@ Ralph Loop 的核心目标是"持续迭代直到真正完成"，但实际上经�
 │  ┌─────────────────────────────────────────┐                    │
 │  │         plugin/ralph.ts (Stop Hook)     │                    │
 │  │                                         │                    │
-│  │  拦截 session.idle 事件                  │                   │
-│  │  检查 <promise> 标签                     │                   │
-│  │  未完成 → 重新注入提示词继续循环          │                  │
+│  │  Intercept session.idle event           │                    │
+│  │  Check for <promise> tag                │                    │
+│  │  Incomplete → Re-inject prompt, Loop    │                    │
 │  └─────────────────────────────────────────┘                    │
 │       │                                                         │
 │       ▼                                                         │
-│   最终验收报告                                                  │
+│   Final Acceptance Report                                       │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```

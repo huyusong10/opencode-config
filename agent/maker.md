@@ -953,41 +953,41 @@ Checkpoint 用于验证自动化之后，而非替代自动化。
 │  └─────────────────────┘                                            │
 │       │                                                             │
 │       ├── human-verify ──────────────────────────────────┐          │
-│       │   1. Ensure automation is complete                │         │
-│       │   2. Provide verification steps                   │         │
-│       │   3. Wait for user confirmation                   │         │
-│       │                                                   ▼         │
-│       │                                          ┌────────────────┐ │
-│       │                                          │ User: "Pass"   │ │
-│       │                                          │ or describe    │ │
-│       │                                          └────────────────┘ │
-│       │                                                   │         │
-│       ├── decision ─────────────────────────────────────┐           │
+│       │   1. Ensure automation is complete               │          │
+│       │   2. Provide verification steps                  │          │
+│       │   3. Wait for user confirmation                  │          │
+│       │                                                  ▼          │
+│       │                                         ┌────────────────┐  │
+│       │                                         │ User: "Pass"   │  │
+│       │                                         │ or describe    │  │
+│       │                                         └────────────────┘  │
+│       │                                                  │          │
+│       ├── decision ──────────────────────────────────────┐          │
 │       │   1. Provide options table                       │          │
 │       │   2. Wait for user choice                        │          │
 │       │   3. Continue per selection                      ▼          │
-│       │                                          ┌────────────────┐ │
-│       │                                          │ User: "A"      │ │
-│       │                                          └────────────────┘ │
-│       │                                                   │         │
-│       ├── human-action ─────────────────────────────────┐           │
+│       │                                         ┌────────────────┐  │
+│       │                                         │ User: "A"      │  │
+│       │                                         └────────────────┘  │
+│       │                                                  │          │
+│       ├── human-action ──────────────────────────────────┐          │
 │       │   1. Describe what needs to be done              │          │
 │       │   2. Provide verification command                │          │
 │       │   3. Wait for user to complete                   ▼          │
-│       │                                          ┌────────────────┐ │
-│       │                                          │ User: "Done"   │ │
-│       │                                          └────────────────┘ │
-│       │                                                   │         │
+│       │                                         ┌────────────────┐  │
+│       │                                         │ User: "Done"   │  │
+│       │                                         └────────────────┘  │
+│       │                                                  │          │
 │       └── auth-gate ─────────────────────────────────────┐          │
-│           1. Identify required credentials                │         │
-│           2. Provide steps to obtain them                 │         │
-│           3. Wait for user configuration                  ▼         │
-│                                                  ┌────────────────┐ │
-│                                                  │ User: Configured││
-│                                                  └────────────────┘ │
-│                                                           │         │
-│                                                           ▼         │
-│                                                    Resume execution │
+│           1. Identify required credentials               │          │
+│           2. Provide steps to obtain them                │          │
+│           3. Wait for user configuration                 ▼          │
+│                                                 ┌────────────────┐  │
+│                                                 │User: Configured│  │
+│                                                 └────────────────┘  │
+│                                                          │          │
+│                                                          ▼          │
+│                                                   Resume execution  │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -1215,52 +1215,52 @@ Checkpoint 用于验证自动化之后，而非替代自动化。
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │  Step 1: Analyze Feature Requirements                       │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │ Extract task requirements from PLAN.md               │   │
-│  │ Identify acceptance criteria                         │   │
-│  └─────────────────────────────────────────────────────┘    │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │ Extract task requirements from PLAN.md                │  │
+│  │ Identify acceptance criteria                          │  │
+│  └───────────────────────────────────────────────────────┘  │
 │                         │                                   │
 │                         ▼                                   │
 │  Step 2: Infer Test File Location                           │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │ Impl file: src/auth/login.ts                         │   │
-│  │ Test files (priority order):                         │   │
-│  │   1. src/auth/login.test.ts  (same dir .test.ts)     │   │
-│  │   2. src/auth/login.spec.ts  (same dir .spec.ts)     │   │
-│  │   3. src/auth/__tests__/login.ts (subdir)            │   │
-│  │   4. tests/auth/login.test.ts (centralized dir)      │   │
-│  └─────────────────────────────────────────────────────┘    │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │ Impl file: src/auth/login.ts                          │  │
+│  │ Test files (priority order):                          │  │
+│  │   1. src/auth/login.test.ts  (same dir .test.ts)      │  │
+│  │   2. src/auth/login.spec.ts  (same dir .spec.ts)      │  │
+│  │   3. src/auth/__tests__/login.ts (subdir)             │  │
+│  │   4. tests/auth/login.test.ts (centralized dir)       │  │
+│  └───────────────────────────────────────────────────────┘  │
 │                         │                                   │
 │                         ▼                                   │
 │  Step 3: RED - Write Failing Tests                          │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │ Create test file (Hook requires this first)          │   │
-│  │ Write acceptance test cases                          │   │
-│  │ Run tests → confirm they fail                        │   │
-│  └─────────────────────────────────────────────────────┘    │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │ Create test file (Hook requires this first)           │  │
+│  │ Write acceptance test cases                           │  │
+│  │ Run tests → confirm they fail                         │  │
+│  └───────────────────────────────────────────────────────┘  │
 │                         │                                   │
 │                         ▼                                   │
 │  Step 4: GREEN - Minimal Implementation                     │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │ Create/modify implementation file                    │   │
-│  │ Write only enough code to pass tests                 │   │
-│  │ Run tests → confirm they pass                        │   │
-│  └─────────────────────────────────────────────────────┘    │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │ Create/modify implementation file                     │  │
+│  │ Write only enough code to pass tests                  │  │
+│  │ Run tests → confirm they pass                         │  │
+│  └───────────────────────────────────────────────────────┘  │
 │                         │                                   │
 │                         ▼                                   │
 │  Step 5: REFACTOR - Optimize                                │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │ Refactor under test protection                       │   │
-│  │ Keep tests passing                                   │   │
-│  │ @reviewer reviews code quality                       │   │
-│  └─────────────────────────────────────────────────────┘    │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │ Refactor under test protection                        │  │
+│  │ Keep tests passing                                    │  │
+│  │ @reviewer reviews code quality                        │  │
+│  └───────────────────────────────────────────────────────┘  │
 │                         │                                   │
 │                         ▼                                   │
 │  Step 6: Commit Task                                        │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │ Update PLAN.md task status: [ ] → [x]                │   │
-│  │ @committer commits code                              │   │
-│  └─────────────────────────────────────────────────────┘    │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │ Update PLAN.md task status: [ ] → [x]                 │  │
+│  │ @committer commits code                               │  │
+│  └───────────────────────────────────────────────────────┘  │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
