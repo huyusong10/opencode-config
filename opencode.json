@@ -285,7 +285,8 @@
     "@mohak34/opencode-notifier@latest",
     "opencode-pty@latest",
     "@my-org/custom-plugin",
-    "./plugin/guard.ts"
+    "./plugin/guard.ts",
+    "opencode-worktree@latest"
   ],
   "instructions": [
     "rules/ascii-diagrams.md",
