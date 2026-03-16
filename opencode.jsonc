@@ -262,6 +262,10 @@
     // Checkpoint 系统 - 任务需要用户介入时的处理协议
     "rules/checkpoint-system.md",
     // STATE.md 验证 - 状态文件一致性检查和恢复
-    "rules/state-validation.md"
+    "rules/state-validation.md",
+    // 规划模式 - 需求探索、Goal-Backward、Wave 分组
+    "rules/planning-mode.md",
+    // 执行模式 - 模式调度、快速通道、归档流程
+    "rules/execution-mode.md"
   ]
 }

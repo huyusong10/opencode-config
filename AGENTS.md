@@ -72,6 +72,19 @@ ASCII 框图内的内容必须使用 **英文**，禁止中文。
 
 ---
 
+## Builder Agent
+
+推荐使用 `@builder` 进行一键式开发，它会自动完成从规划到执行的全流程：
+
+1. 检查 `.planning/` 状态
+2. 根据 STATE.md status 自动切换模式
+3. Planning Mode → Execution Mode 自动流转
+4. 无需手动切换 agent
+
+**向后兼容：** `@architect` 和 `@maker` 仍可单独使用
+
+---
+
 ## Opencode功能拓展
 
 一定要参考官方文档：`https://opencode.ai/docs/zh-cn/sdk/`

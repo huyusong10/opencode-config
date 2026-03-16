@@ -38,9 +38,9 @@ cd ~/opencode-config && git pull
 
 ## 核心架构
 
-### 双前端模式
+### Builder Agent（推荐）
 
-采用 **Architect + Maker** 双前端架构，清晰分离规划与执行：
+**一键式调用：** 使用 `@builder` 完成从规划到执行的全流程，无需手动切换 agent。
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -49,23 +49,22 @@ cd ~/opencode-config && git pull
                                        │
                                        ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                           Architect                                         │
+│                           Builder                                           │
 │                                                                             │
-│  Responsibilities: Understand requirements, design solution, create plan    │
-│  Outputs: .planning/ directory (PROJECT.md, REQUIREMENTS.md, etc.)          │
-│  Delegates: @researcher for technical research                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                       │
-                                       ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                             Maker                                           │
+│  State-Driven: 自动检测 STATE.md status 决定模式                            │
+│  - .planning/ 不存在 → Planning Mode (创建规划)                             │
+│  - status: ready → Execution Mode (执行计划)                                │
+│  - status: in_progress → Resume Mode (恢复中断)                             │
 │                                                                             │
-│  Responsibilities: Execute plan, coordinate subagents, manage state         │
-│  Modes: ralph | tdd | standard | spike | debug | refactor | migrate         │
-│  Coordinates: @coder, @tester, @debugger, @reviewer, @researcher,           │
-│               @committer                                                    │
+│  Delegates: @coder, @tester, @debugger, @reviewer, @researcher, @committer  │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
+
+### 向后兼容
+
+仍可单独使用：
+- `@architect` - 仅规划，不执行
+- `@maker` - 仅执行已有计划
 
 ### 功能型 Subagent
 
