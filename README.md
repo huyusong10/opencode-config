@@ -155,6 +155,7 @@ Maker 负责执行 Architect 创建的计划，协调 subagent 并管理状态�
 │  Phase 1: Initialization                                                    │
 │  ┌─────────────────────────────────────────────────────────────────────┐    │
 │  │ - Load .planning/STATE.md                                           │    │
+│  │ - State consistency check: detect interrupted session               │    │
 │  │ - Parse current PLAN.md (execution_mode, wave, tasks)               │    │
 │  │ - Build Wave execution graph (parallel/serial grouping)             │    │
 │  └─────────────────────────────────────────────────────────────────────┘    │
@@ -175,8 +176,9 @@ Maker 负责执行 Architect 创建的计划，协调 subagent 并管理状态�
 │  Phase 3: Task Execution                                                    │
 │  ┌─────────────────────────────────────────────────────────────────────┐    │
 │  │ For each task:                                                      │    │
-│  │ - Prepare context -> Delegate to subagent -> Two-stage review       │    │
-│  │   Stage 1: Spec Compliance, Stage 2: Code Quality                   │    │
+│  │ - Fast Path Check: ≤2 files, ≤20 lines, no architecture impact?    │    │
+│  │   Yes -> Maker direct execute -> verify -> commit                   │    │
+│  │   No  -> Delegate to subagent -> Two-stage review                   │    │
 │  │ - Verify completion -> @committer commit                            │    │
 │  └─────────────────────────────────────────────────────────────────────┘    │
 │                                     ↓                                       │
@@ -347,7 +349,17 @@ opencode-config/
 ├── rules/                 # 补充规则
 │   ├── ascii-diagrams.md
 │   ├── codeact.md
-│   └── subagent.md
+│   ├── subagent.md
+│   ├── deviation-rules.md   # 偏差处理规则
+│   ├── checkpoint-system.md # Checkpoint 系统
+│   └── state-validation.md  # STATE.md 验证
+└── .planning/             # 项目规划目录（运行时生成）
+    ├── PROJECT.md
+    ├── REQUIREMENTS.md
+    ├── ROADMAP.md
+    ├── STATE.md
+    ├── phases/
+    └── .logs/
 ```
 
 ---
