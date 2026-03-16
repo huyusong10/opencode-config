@@ -68,7 +68,8 @@ async function getGitDiffStats(ctx: PluginInput, sinceCommit?: string): Promise<
     }
 
     return { files_changed: filesChanged, lines_added: linesAdded, lines_deleted: linesDeleted }
-  } catch {
+  } catch (err) {
+    console.error(`[task-logger] Failed to get git diff stats: ${err}`)
     return { files_changed: [], lines_added: 0, lines_deleted: 0 }
   }
 }
@@ -89,7 +90,8 @@ async function getGitCommits(ctx: PluginInput, limit: number = 5): Promise<GitCo
         timestamp: parts[3] || "",
       }
     })
-  } catch {
+  } catch (err) {
+    console.error(`[task-logger] Failed to get git commits: ${err}`)
     return []
   }
 }
@@ -119,7 +121,8 @@ function parseStateFile(ctx: PluginInput) {
     }
 
     return { phase, plan, task }
-  } catch {
+  } catch (err) {
+    console.error(`[task-logger] Failed to parse STATE.md: ${err}`)
     return null
   }
 }
@@ -138,14 +141,22 @@ function writeLog(ctx: PluginInput, entry: LogEntry) {
   const dateStr = new Date().toISOString().split("T")[0]
   const line = JSON.stringify(entry) + "\n"
 
-  try {
-    appendFileSync(join(dailyDir, `${dateStr}.jsonl`), line)
-    appendFileSync(join(sessionDir, `${entry.agent || "maker"}.jsonl`), line)
-    if (entry.phase && entry.plan) {
-      appendFileSync(join(taskDir, `${entry.phase}-${entry.plan}.jsonl`), line)
+  // Use session-scoped daily log files to avoid concurrent write conflicts
+  const sessionPrefix = entry.session.slice(0, 8)
+  const targets: [string, string][] = [
+    ["daily", join(dailyDir, `${dateStr}-${sessionPrefix}.jsonl`)],
+    ["session", join(sessionDir, `${entry.agent || "maker"}.jsonl`)],
+  ]
+  if (entry.phase && entry.plan) {
+    targets.push(["task", join(taskDir, `${entry.phase}-${entry.plan}.jsonl`)])
+  }
+
+  for (const [label, path] of targets) {
+    try {
+      appendFileSync(path, line)
+    } catch (err) {
+      console.error(`[task-logger] Failed to write ${label} log to ${path}: ${err}`)
     }
-  } catch {
-    // silently fail logging if fs error
   }
 }
 

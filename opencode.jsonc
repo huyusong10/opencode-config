@@ -256,6 +256,12 @@
     // Codeact 模式 - 复杂流程优先编写脚本而非直接调用工具
     "rules/codeact.md",
     // Subagent 决策指南 - 何时使用子代理、何时直接处理
-    "rules/subagent.md"
+    "rules/subagent.md",
+    // 偏差处理规则 - 自动修复 vs 用户升级的判断规则
+    "rules/deviation-rules.md",
+    // Checkpoint 系统 - 任务需要用户介入时的处理协议
+    "rules/checkpoint-system.md",
+    // STATE.md 验证 - 状态文件一致性检查和恢复
+    "rules/state-validation.md"
   ]
 }
