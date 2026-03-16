@@ -29,28 +29,28 @@ tools:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Hook 强制约束层                           │
+│                    Hook Enforcement Layer                   │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │  Hook 1: architect-first-guard                              │
-│  触发: Write/Edit 源代码文件                                 │
-│  检查: .planning/STATE.md 存在且 status = ready              │
-│  阻止: 无 Architect 规划时拒绝执行                           │
+│  Trigger: Write/Edit source code files                      │
+│  Check: .planning/STATE.md exists and status = ready        │
+│  Block: Reject execution without Architect planning         │
 │                                                             │
 │  Hook 2: execution-mode-guard                               │
-│  触发: 同上                                                  │
-│  检查: STATE.md 中 execution_mode 字段存在                   │
-│  阻止: 未指定执行模式时拒绝执行                              │
+│  Trigger: Same as Hook 1                                    │
+│  Check: execution_mode field exists in STATE.md             │
+│  Block: Reject execution without specified mode             │
 │                                                             │
-│  Hook 3: test-first-guard (TDD模式)                         │
-│  触发: TDD模式下写入实现文件                                 │
-│  检查: 对应测试文件已存在                                    │
-│  阻止: 必须先写测试再写实现                                  │
+│  Hook 3: test-first-guard (TDD mode)                        │
+│  Trigger: Write implementation files in TDD mode            │
+│  Check: Corresponding test file already exists              │
+│  Block: Must write tests before implementation              │
 │                                                             │
 │  Hook 4: plan-completion-guard                              │
-│  触发: 标记 plan 完成时                                      │
-│  检查: 所有任务已完成 + 验证通过                             │
-│  阻止: 部分完成时拒绝标记为完成                              │
+│  Trigger: Mark plan as complete                             │
+│  Check: All tasks done + verification passed                │
+│  Block: Reject completion mark when partially done          │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -108,14 +108,14 @@ This operation modifies source code and requires prior planning.
 
 ```
 .planning/
-├── .logs/                          # 隐藏日志目录
-│   ├── sessions/                   # 按会话组织
-│   │   └── [session-id]/          
-│   │       ├── architect.jsonl    # Architect阶段日志
-│   │       └── maker.jsonl        # Maker执行日志
-│   ├── daily/                     # 按日期组织
-│   │   └── 2024-01-15.jsonl       # 每天一个文件
-│   └── tasks/                     # 按任务组织
+├── .logs/                          # hidden log directory
+│   ├── sessions/                   # organized by session
+│   │   └── [session-id]/
+│   │       ├── architect.jsonl    # Architect phase logs
+│   │       └── maker.jsonl        # Maker execution logs
+│   ├── daily/                     # organized by date
+│   │   └── 2024-01-15.jsonl       # one file per day
+│   └── tasks/                     # organized by task
 │       └── 01-foundation-01-01.jsonl
 ```
 
@@ -256,7 +256,7 @@ find .planning/phases -name "*-PLAN.md" -exec grep -L "complete: true" {} \;
 │  └─────────┘ └─────────┘    └─────────┘ └─────────┘    └─────────┘ │
 │       │           │              ↑           ↑              ↑      │
 │       └───────────┴──────────────┴───────────┘              │      │
-│              同 Wave 内并行       Wave 间串行                │      │
+│         Parallel within Wave     Sequential across Waves    │      │
 │                                                                    │
 └────────────────────────────────────────────────────────────────────┘
 ```
@@ -300,19 +300,19 @@ find .planning/phases -name "*-PLAN.md" -exec grep -L "complete: true" {} \;
 ├─────────────────────────────────────┤
 │                                     │
 │  ┌─────────┐                        │
-│  │ @coder  │──→ 实现                │
+│  │ @coder  │──→ Implement           │
 │  └─────────┘                        │
 │       │                             │
 │       ▼                             │
 │  ┌─────────┐                        │
-│  │ @tester │──→ 验证                │
+│  │ @tester │──→ Verify              │
 │  └─────────┘                        │
 │       │                             │
 │       ▼                             │
 │  ┌─────────────────────────────┐    │
-│  │ 所有测试通过?               │    │
-│  │ 是 → 完成                   │    │
-│  │ 否 → @debugger → 循环       │    │
+│  │ All tests pass?             │    │
+│  │ Yes → Done                  │    │
+│  │ No  → @debugger → Loop      │    │
 │  └─────────────────────────────┘    │
 │                                     │
 └─────────────────────────────────────┘
@@ -528,55 +528,55 @@ update_wave_progress(wave, completed_plans)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    两阶段审查流程                            │
+│                    Two-Stage Review Flow                    │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
-│  Stage 1: Spec Compliance (规范符合性)                      │
+│  Stage 1: Spec Compliance                                   │
 │  ┌─────────────────────────────────────────────────────┐   │
 │  │ @reviewer --stage=spec                              │   │
 │  │                                                     │   │
-│  │ 检查：                                              │   │
-│  │ - 实现了所有计划中的功能？                          │   │
-│  │ - 没有过度实现（计划外功能）？                      │   │
-│  │ - 没有实现不足（遗漏功能）？                        │   │
-│  │ - API/文件结构与计划一致？                          │   │
+│  │ Checks:                                             │   │
+│  │ - All planned features implemented?                 │   │
+│  │ - No over-implementation (unplanned features)?      │   │
+│  │ - No under-implementation (missing features)?       │   │
+│  │ - API/file structure matches the plan?              │   │
 │  └─────────────────────────────────────────────────────┘   │
 │                         │                                   │
 │                         ▼                                   │
 │              ┌─────────────────────┐                        │
-│              │ Stage 1 通过?       │                        │
+│              │ Stage 1 Pass?       │                        │
 │              └─────────────────────┘                        │
 │                   │           │                             │
 │               YES │           │ NO                          │
 │                   ▼           ▼                             │
 │     ┌─────────────────┐  ┌──────────────────────┐           │
-│     │ Stage 2         │  │ 返回 @coder          │           │
-│     │ (继续)          │  │ 修复规范问题         │           │
+│     │ Stage 2         │  │ Back to @coder       │           │
+│     │ (continue)      │  │ Fix spec issues      │           │
 │     └─────────────────┘  └──────────────────────┘           │
 │                   │                                         │
 │                   ▼                                         │
-│  Stage 2: Code Quality (代码质量)                           │
+│  Stage 2: Code Quality                                      │
 │  ┌─────────────────────────────────────────────────────┐   │
 │  │ @reviewer --stage=quality                           │   │
 │  │                                                     │   │
-│  │ 检查：                                              │   │
-│  │ - 代码风格一致？                                    │   │
-│  │ - 命名清晰？                                        │   │
-│  │ - 错误处理完善？                                    │   │
-│  │ - 安全性检查通过？                                  │   │
-│  │ - 无重复代码？                                      │   │
+│  │ Checks:                                             │   │
+│  │ - Code style consistent?                            │   │
+│  │ - Naming clear?                                     │   │
+│  │ - Error handling complete?                          │   │
+│  │ - Security checks passed?                           │   │
+│  │ - No duplicate code?                                │   │
 │  └─────────────────────────────────────────────────────┘   │
 │                         │                                   │
 │                         ▼                                   │
 │              ┌─────────────────────┐                        │
-│              │ Stage 2 通过?       │                        │
+│              │ Stage 2 Pass?       │                        │
 │              └─────────────────────┘                        │
 │                   │           │                             │
 │               YES │           │ NO                          │
 │                   ▼           ▼                             │
 │     ┌─────────────────┐  ┌──────────────────────┐           │
-│     │ 继续提交        │  │ 返回 @coder          │           │
-│     │                 │  │ 修复质量问题         │           │
+│     │ Proceed to      │  │ Back to @coder       │           │
+│     │ Commit          │  │ Fix quality issues   │           │
 │     └─────────────────┘  └──────────────────────┘           │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
@@ -945,49 +945,49 @@ Checkpoint 用于验证自动化之后，而非替代自动化。
 │                    CHECKPOINT PROCESSING                            │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
-│  遇到 checkpoint 任务                                                │
+│  Checkpoint task reached                                            │
 │       │                                                             │
 │       ▼                                                             │
 │  ┌─────────────────────┐                                            │
-│  │ 类型判断            │                                            │
+│  │ Classify type       │                                            │
 │  └─────────────────────┘                                            │
 │       │                                                             │
 │       ├── human-verify ──────────────────────────────────┐          │
-│       │   1. 确保自动化已完成                              │          │
-│       │   2. 提供验证步骤                                  │          │
-│       │   3. 等待用户确认                                  │          │
+│       │   1. Ensure automation is complete                │          │
+│       │   2. Provide verification steps                   │          │
+│       │   3. Wait for user confirmation                   │          │
 │       │                                                   ▼          │
 │       │                                          ┌────────────────┐ │
-│       │                                          │ 用户: "通过"   │ │
-│       │                                          │ 或描述问题     │ │
+│       │                                          │ User: "Pass"   │ │
+│       │                                          │ or describe    │ │
 │       │                                          └────────────────┘ │
 │       │                                                   │          │
 │       ├── decision ─────────────────────────────────────┐          │
-│       │   1. 提供选项表格                                │          │
-│       │   2. 等待用户选择                                │          │
-│       │   3. 按选择继续                                  ▼          │
+│       │   1. Provide options table                       │          │
+│       │   2. Wait for user choice                        │          │
+│       │   3. Continue per selection                      ▼          │
 │       │                                          ┌────────────────┐ │
-│       │                                          │ 用户: "选项 A" │ │
+│       │                                          │ User: "A"      │ │
 │       │                                          └────────────────┘ │
 │       │                                                   │          │
 │       ├── human-action ─────────────────────────────────┐          │
-│       │   1. 说明需要做什么                              │          │
-│       │   2. 提供验证命令                                │          │
-│       │   3. 等待用户完成                                ▼          │
+│       │   1. Describe what needs to be done              │          │
+│       │   2. Provide verification command                │          │
+│       │   3. Wait for user to complete                   ▼          │
 │       │                                          ┌────────────────┐ │
-│       │                                          │ 用户: "完成"   │ │
+│       │                                          │ User: "Done"   │ │
 │       │                                          └────────────────┘ │
 │       │                                                   │          │
 │       └── auth-gate ─────────────────────────────────────┐          │
-│           1. 识别需要什么凭证                            │          │
-│           2. 提供获取步骤                                │          │
-│           3. 等待用户配置                                ▼          │
+│           1. Identify required credentials                │          │
+│           2. Provide steps to obtain them                 │          │
+│           3. Wait for user configuration                  ▼          │
 │                                                  ┌────────────────┐ │
-│                                                  │ 用户: 配置完成 │ │
+│                                                  │ User: Configured│ │
 │                                                  └────────────────┘ │
 │                                                           │          │
 │                                                           ▼          │
-│                                                    继续执行           │
+│                                                    Resume execution  │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -1141,81 +1141,22 @@ Checkpoint 用于验证自动化之后，而非替代自动化。
 
 ---
 
-## 错误处理 (旧版保留)
-
-### 自动解决 (规则 1-3)
-
-| 规则 | 触发条件 | 操作 |
-|------|---------|------|
-| 规则 1 | 代码中有 bug/错误 | 通过 @debugger 自动修复 |
-| 规则 2 | 缺少关键功能 | 通过 @coder 自动添加 |
-| 规则 3 | 阻塞性问题 | 自动解决 |
-
-### 用户升级 (规则 4)
-
-| 触发条件 | 操作 |
-|---------|------|
-| 需要架构变更 | 停止，询问用户 |
-| 缺少外部依赖 | 停止，询问用户 |
-| 需求不明确 | 停止，询问用户 |
-
-### 修复尝试限制
-
-在单个任务上自动修复失败 3 次后:
-- 停止修复
-- 在 SUMMARY.md 中记录
-- 请求用户指导
-
----
-
-## 检查点处理
-
-### 检查点类型
-
-| 类型 | 行为 |
-|------|------|
-| `human-verify` | 暂停等待用户验证 |
-| `decision` | 暂停等待用户选择 |
-| `human-action` | 暂停等待手动操作 |
-
-### 检查点格式
-
-```markdown
-## 到达检查点
-
-**类型:** [human-verify/decision/human-action]
-**阶段:** [阶段]
-**计划:** [计划]
-**任务:** [任务]
-
-### 已完成工作
-[已完成工作的描述]
-
-### 需要的操作
-[需要用户执行的操作]
-
-### 恢复命令
-完成后输入: "continue"
-```
-
----
-
 ## 完成协议
 
 **重要：Plan完成时必须执行归档流程，不允许跳过。**
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Plan 完成检查清单                         │
+│                    Plan Completion Checklist                 │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
-│  □ 所有任务标记为 [x] 完成                                   │
-│  □ 所有验证命令通过                                          │
-│  □ 所有成功标准满足                                          │
-│  □ Hook: plan-completion-guard 验证通过                     │
-│  □ 创建 SUMMARY.md                                          │
-│  □ 移动 PLAN.md 到 archive/                                 │
-│  □ 更新 STATE.md                                            │
+│  □ All tasks marked [x] complete                            │
+│  □ All verification commands passed                         │
+│  □ All success criteria met                                 │
+│  □ Hook: plan-completion-guard verified                     │
+│  □ SUMMARY.md created                                       │
+│  □ PLAN.md moved to archive/                                │
+│  □ STATE.md updated                                         │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -1273,52 +1214,52 @@ Checkpoint 用于验证自动化之后，而非替代自动化。
 │                    ATDD Feature-Level TDD                    │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
-│  Step 1: 分析功能需求                                        │
+│  Step 1: Analyze Feature Requirements                        │
 │  ┌─────────────────────────────────────────────────────┐   │
-│  │ 从 PLAN.md 提取任务的功能需求                         │   │
-│  │ 确定验收标准                                         │   │
+│  │ Extract task requirements from PLAN.md               │   │
+│  │ Identify acceptance criteria                         │   │
 │  └─────────────────────────────────────────────────────┘   │
 │                         │                                   │
 │                         ▼                                   │
-│  Step 2: 推断测试文件位置                                    │
+│  Step 2: Infer Test File Location                            │
 │  ┌─────────────────────────────────────────────────────┐   │
-│  │ 实现文件: src/auth/login.ts                          │   │
-│  │ 测试文件（优先级）:                                   │   │
-│  │   1. src/auth/login.test.ts  (同目录 .test.ts)       │   │
-│  │   2. src/auth/login.spec.ts  (同目录 .spec.ts)       │   │
-│  │   3. src/auth/__tests__/login.ts (子目录)            │   │
-│  │   4. tests/auth/login.test.ts (集中目录)             │   │
+│  │ Impl file: src/auth/login.ts                         │   │
+│  │ Test files (priority order):                         │   │
+│  │   1. src/auth/login.test.ts  (same dir .test.ts)     │   │
+│  │   2. src/auth/login.spec.ts  (same dir .spec.ts)     │   │
+│  │   3. src/auth/__tests__/login.ts (subdir)            │   │
+│  │   4. tests/auth/login.test.ts (centralized dir)      │   │
 │  └─────────────────────────────────────────────────────┘   │
 │                         │                                   │
 │                         ▼                                   │
-│  Step 3: RED - 编写失败测试                                  │
+│  Step 3: RED - Write Failing Tests                           │
 │  ┌─────────────────────────────────────────────────────┐   │
-│  │ 创建测试文件 (Hook强制要求先创建)                     │   │
-│  │ 编写验收测试用例                                     │   │
-│  │ 运行测试 → 确认失败                                  │   │
+│  │ Create test file (Hook requires this first)          │   │
+│  │ Write acceptance test cases                          │   │
+│  │ Run tests → confirm they fail                        │   │
 │  └─────────────────────────────────────────────────────┘   │
 │                         │                                   │
 │                         ▼                                   │
-│  Step 4: GREEN - 最小化实现                                  │
+│  Step 4: GREEN - Minimal Implementation                      │
 │  ┌─────────────────────────────────────────────────────┐   │
-│  │ 创建/修改实现文件                                    │   │
-│  │ 只写让测试通过的最少代码                              │   │
-│  │ 运行测试 → 确认通过                                  │   │
+│  │ Create/modify implementation file                    │   │
+│  │ Write only enough code to pass tests                 │   │
+│  │ Run tests → confirm they pass                        │   │
 │  └─────────────────────────────────────────────────────┘   │
 │                         │                                   │
 │                         ▼                                   │
-│  Step 5: REFACTOR - 重构优化                                 │
+│  Step 5: REFACTOR - Optimize                                 │
 │  ┌─────────────────────────────────────────────────────┐   │
-│  │ 在测试保护下重构代码                                  │   │
-│  │ 保持测试通过                                        │   │
-│  │ @reviewer 审查代码质量                               │   │
+│  │ Refactor under test protection                       │   │
+│  │ Keep tests passing                                   │   │
+│  │ @reviewer reviews code quality                       │   │
 │  └─────────────────────────────────────────────────────┘   │
 │                         │                                   │
 │                         ▼                                   │
-│  Step 6: 提交任务                                            │
+│  Step 6: Commit Task                                         │
 │  ┌─────────────────────────────────────────────────────┐   │
-│  │ 更新 PLAN.md 任务状态: [ ] → [x]                     │   │
-│  │ @committer 提交代码                                  │   │
+│  │ Update PLAN.md task status: [ ] → [x]                │   │
+│  │ @committer commits code                              │   │
 │  └─────────────────────────────────────────────────────┘   │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
@@ -1384,10 +1325,10 @@ Hook: plan-completion-guard 验证
 ├── phases/
 │   ├── 01-foundation/
 │   │   ├── 01-CONTEXT.md
-│   │   ├── 01-02-PLAN.md        # 待执行
-│   │   └── archive/             # 归档目录
-│   │       ├── 01-01-PLAN.md    # 已完成
-│   │       └── 01-01-SUMMARY.md # 执行摘要
+│   │   ├── 01-02-PLAN.md        # pending execution
+│   │   └── archive/             # archive directory
+│   │       ├── 01-01-PLAN.md    # completed
+│   │       └── 01-01-SUMMARY.md # execution summary
 │   └── 02-api/
 ```
 

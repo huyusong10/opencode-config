@@ -65,13 +65,17 @@ if [ -d "$CONFIG_DIR" ]; then
         exit 1
     fi
     
-    for item in AGENTS.md agent command plugin skills tui.json opencode.json; do
+    for item in AGENTS.md agent command plugin skills tui.json rules; do
         if [ -e "$CONFIG_DIR/$item" ]; then
             if ! mv "$CONFIG_DIR/$item" "$BACKUP/" 2>/dev/null; then
                 echo "==> WARNING: Failed to backup '$item', skipping..."
             fi
         fi
     done
+    # Backup opencode.json separately (copy, not move — keeps it in place for merging)
+    if [ -f "$CONFIG_DIR/opencode.json" ]; then
+        cp "$CONFIG_DIR/opencode.json" "$BACKUP/opencode.json" 2>/dev/null || true
+    fi
 fi
 
 mkdir -p "$CONFIG_DIR" || {
@@ -228,7 +232,7 @@ if [ "$MODE" = "copy" ]; then
         done
     else
         TEMP_DIR=$(mktemp -d)
-        trap "rm -rf $TEMP_DIR" EXIT
+        trap 'rm -rf "$TEMP_DIR"' EXIT
         echo "==> Cloning repository to temporary directory..."
         if ! git clone --depth 1 https://github.com/huyusong10/opencode-config.git "$TEMP_DIR" 2>/dev/null; then
             echo "==> ERROR: Failed to clone repository. Please check your network connection."

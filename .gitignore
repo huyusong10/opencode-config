@@ -9,6 +9,9 @@ __pycache__/
 # Dockman files:
 .dockman/
 
+# Planning logs
+.planning/.logs/
+
 # Reference
 ref/
 

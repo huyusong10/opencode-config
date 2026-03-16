@@ -50,14 +50,14 @@ tools:
 
 ```
 .planning/
-├── PROJECT.md          # 项目愿景、约束、决策
-├── REQUIREMENTS.md     # 带 REQ-ID 的需求列表
-├── ROADMAP.md          # 阶段路线图和里程碑
-├── STATE.md            # 项目状态记忆
+├── PROJECT.md          # project vision, constraints, decisions
+├── REQUIREMENTS.md     # requirements with REQ-IDs
+├── ROADMAP.md          # phase roadmap and milestones
+├── STATE.md            # project state memory
 └── phases/
     └── 01-name/
-        ├── 01-CONTEXT.md    # 阶段决策
-        └── 01-01-PLAN.md    # 执行计划
+        ├── 01-CONTEXT.md    # phase decisions
+        └── 01-01-PLAN.md    # execution plan
 ```
 
 ---
@@ -143,58 +143,59 @@ cat pyproject.toml 2>/dev/null | head -30
 │                   Goal-Backward Methodology                 │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
-│  Step 1: 陈述目标                                           │
+│  Step 1: State the Goal                                     │
 │  ┌─────────────────────────────────────────────────────┐   │
-│  │ 从 ROADMAP.md 提取阶段目标                            │   │
-│  │ 必须是结果导向，而非任务导向                          │   │
-│  │ 好: "可工作的聊天界面" (结果)                         │   │
-│  │ 坏: "构建聊天组件" (任务)                             │   │
+│  │ Extract phase goal from ROADMAP.md                   │   │
+│  │ Must be outcome-oriented, not task-oriented          │   │
+│  │ Good: "working chat interface" (outcome)             │   │
+│  │ Bad:  "build chat component"   (task)                │   │
 │  └─────────────────────────────────────────────────────┘   │
 │                         ↓                                   │
-│  Step 2: 推导可观察真理                                     │
+│  Step 2: Derive Observable Truths                           │
 │  ┌─────────────────────────────────────────────────────┐   │
-│  │ 问题: "目标要达成，什么必须为真？"                     │   │
-│  │ 列出 3-7 条从用户视角可验证的行为                     │   │
+│  │ Question: "For the goal to be met, what must be true?"│  │
+│  │ List 3-7 user-verifiable behaviors                   │   │
 │  │                                                       │   │
-│  │ 示例 (聊天界面):                                      │   │
-│  │ - 用户能看到现有消息                                  │   │
-│  │ - 用户能输入新消息                                    │   │
-│  │ - 用户能发送消息                                      │   │
-│  │ - 发送的消息出现在列表中                              │   │
-│  │ - 消息刷新后持久存在                                  │   │
+│  │ Example (chat interface):                             │   │
+│  │ - User can see existing messages                      │   │
+│  │ - User can type a new message                         │   │
+│  │ - User can send a message                             │   │
+│  │ - Sent messages appear in the list                    │   │
+│  │ - Messages persist across refresh                     │   │
 │  └─────────────────────────────────────────────────────┘   │
 │                         ↓                                   │
-│  Step 3: 推导必需产物                                       │
+│  Step 3: Derive Required Artifacts                          │
 │  ┌─────────────────────────────────────────────────────┐   │
-│  │ 对每条真理问: "这要为真，什么必须存在？"              │   │
+│  │ For each truth ask: "What must exist for this?"       │   │
 │  │                                                       │   │
-│  │ "用户能看到现有消息" 需要:                            │   │
-│  │ - 消息列表组件 (渲染 Message[])                       │   │
-│  │ - 消息状态 (从某处加载)                               │   │
-│  │ - API 路由或数据源 (提供消息)                         │   │
-│  │ - Message 类型定义 (数据形状)                         │   │
+│  │ "User can see messages" requires:                     │   │
+│  │ - Message list component (renders Message[])          │   │
+│  │ - Message state (loaded from somewhere)               │   │
+│  │ - API route or data source (provides messages)        │   │
+│  │ - Message type definition (data shape)                │   │
 │  └─────────────────────────────────────────────────────┘   │
 │                         ↓                                   │
-│  Step 4: 推导必需连接                                       │
+│  Step 4: Derive Required Connections                        │
 │  ┌─────────────────────────────────────────────────────┐   │
-│  │ 对每个产物问: "这要工作，什么必须连接？"              │   │
+│  │ For each artifact ask: "What must connect for this?"  │   │
 │  │                                                       │   │
-│  │ 消息列表组件连接:                                     │   │
-│  │ - 导入 Message 类型 (不用 any)                        │   │
-│  │ - 接收 messages prop 或从 API 获取                   │   │
-│  │ - 遍历 messages 渲染 (不硬编码)                       │   │
-│  │ - 处理空状态 (不只是崩溃)                             │   │
+│  │ Message list component connections:                   │   │
+│  │ - Imports Message type (not any)                      │   │
+│  │ - Receives messages prop or fetches from API          │   │
+│  │ - Iterates messages to render (not hardcoded)         │   │
+│  │ - Handles empty state (does not just crash)           │   │
 │  └─────────────────────────────────────────────────────┘   │
 │                         ↓                                   │
-│  Step 5: 识别关键链路                                       │
+│  Step 5: Identify Critical Links                            │
 │  ┌─────────────────────────────────────────────────────┐   │
-│  │ 问题: "哪里最可能断？"                                │   │
-│  │ 关键链路 = 断裂会导致级联失败的连接                   │   │
+│  │ Question: "Where is failure most likely?"             │   │
+│  │ Critical link = connection whose breakage causes      │   │
+│  │ cascading failures                                    │   │
 │  │                                                       │   │
-│  │ 聊天界面关键链路:                                     │   │
-│  │ - Input onSubmit → API 调用 (断了: 能打不能发)        │   │
-│  │ - API save → 数据库 (断了: 看似发送但不持久)          │   │
-│  │ - Component → 真实数据 (断了: 显示占位符)             │   │
+│  │ Chat interface critical links:                        │   │
+│  │ - Input onSubmit → API (broken: can type/not send)    │   │
+│  │ - API save → DB (broken: appears sent but not persist)│   │
+│  │ - Component → real data (broken: shows placeholder)   │   │
 │  └─────────────────────────────────────────────────────┘   │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
@@ -720,28 +721,28 @@ execution_mode: [mode]     # 必填: tdd | ralph | standard | spike | debug | re
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│              execution_mode 选择决策树                       │
+│              execution_mode Selection Tree                   │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
-│  是否涉及新功能开发？                                        │
-│  ├── 是 → 是否有明确的验收标准？                             │
-│  │         ├── 是 → tdd (推荐)                              │
-│  │         └── 否 → ralph (迭代验证)                        │
+│  New feature development?                                   │
+│  ├── Yes → Has clear acceptance criteria?                   │
+│  │         ├── Yes → tdd (recommended)                      │
+│  │         └── No  → ralph (iterative verification)         │
 │  │                                                          │
-│  是否修复Bug？                                               │
-│  └── 是 → debug (系统化调试)                                │
+│  Fixing a bug?                                              │
+│  └── Yes → debug (systematic debugging)                     │
 │                                                             │
-│  是否重构现有代码？                                          │
-│  └── 是 → refactor (安全重构)                              │
+│  Refactoring existing code?                                 │
+│  └── Yes → refactor (safe refactoring)                      │
 │                                                             │
-│  是否进行版本/数据迁移？                                      │
-│  └── 是 → migrate (带验证迁移)                              │
+│  Version/data migration?                                    │
+│  └── Yes → migrate (validated migration)                    │
 │                                                             │
-│  简单配置/脚本？                                             │
-│  └── 是 → standard (线性执行)                               │
+│  Simple config/script?                                      │
+│  └── Yes → standard (linear execution)                      │
 │                                                             │
-│  技术验证/POC？                                              │
-│  └── 是 → spike (探索性编程)                                │
+│  Technical validation/POC?                                  │
+│  └── Yes → spike (exploratory coding)                       │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
