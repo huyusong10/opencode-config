@@ -152,6 +152,11 @@ git diff HEAD~1 -- [changed-files] | grep "^[+-]" | grep -v "^---\|^+++"
 - **P1** [F3] 更新 `src/cache/store.ts` 的 JSDoc 注释，将 TTL 默认值改为 600s
 - **P2** [F4] 在 API changelog 中记录此字段新增
 
+#### 严重性汇总
+- **[致命 Fatal]**：[P0 findings，或"无"]
+- **[重要 Important]**：[P1 findings，或"无"]
+- **[建议 Suggestion]**：[P2 findings，或"无"]
+
 </reviewer-report>
 ```
 

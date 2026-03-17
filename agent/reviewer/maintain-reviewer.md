@@ -91,6 +91,11 @@ grep -n "'[a-z]\+'\|\"[a-z]\+\"" [changed-files]
 - **P2** [F2] 重命名为 `userData`, `processedResponse`, `tempCache`
 - **P1** [F3] 提取卫语句（early return）减少嵌套层数
 
+#### 严重性汇总
+- **[致命 Fatal]**：[P0 findings，或"无"]
+- **[重要 Important]**：[P1 findings，或"无"]
+- **[建议 Suggestion]**：[P2 findings，或"无"]
+
 </reviewer-report>
 ```
 

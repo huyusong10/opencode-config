@@ -90,6 +90,11 @@ git diff HEAD~1 -- [changed-files] | grep "^[+-]" | grep "function\|=>\|(.*:.*)"
 - **P1** [F2] 明确返回类型: `function transform(data: Input): TransformResult`
 - **P2** [F3] 统一 null/undefined 约定，建议全模块使用 `null` 表示"未找到"
 
+#### 严重性汇总
+- **[致命 Fatal]**：[P0 findings，或"无"]
+- **[重要 Important]**：[P1 findings，或"无"]
+- **[建议 Suggestion]**：[P2 findings，或"无"]
+
 </reviewer-report>
 ```
 

@@ -88,6 +88,11 @@ grep -n "readFile\b\|readFileSync" [changed-files]
 - **P1** [F1] 使用 `getUserByIds(ids)` 批量查询，或使用 DataLoader 模式
 - **P2** [F2] 改为异步 `readFile`，或在启动时缓存配置
 
+#### 严重性汇总
+- **[致命 Fatal]**：[P0 findings，或"无"]
+- **[重要 Important]**：[P1 findings，或"无"]
+- **[建议 Suggestion]**：[P2 findings，或"无"]
+
 </reviewer-report>
 ```
 

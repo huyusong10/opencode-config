@@ -88,6 +88,11 @@ grep -n "console\.log.*password\|logger.*token\|log.*secret" [changed-files]
 - **P0** [F1] 使用参数化查询: `db.query("SELECT * FROM users WHERE id=?", [userId])`
 - **P0** [F2] 迁移到环境变量: `process.env.API_KEY`，并加入 .gitignore
 
+#### 严重性汇总
+- **[致命 Fatal]**：[P0 findings，或"无"]
+- **[重要 Important]**：[P1 findings，或"无"]
+- **[建议 Suggestion]**：[P2 findings，或"无"]
+
 </reviewer-report>
 ```
 

@@ -74,6 +74,11 @@ grep -rn "from.*\/internal\/" --include="*.ts" [changed-files]
 - **P1** [F2] [具体建议]
 - **P2** [可选优化]
 
+#### 严重性汇总
+- **[致命 Fatal]**：[P0 findings，或"无"]
+- **[重要 Important]**：[P1 findings，或"无"]
+- **[建议 Suggestion]**：[P2 findings，或"无"]
+
 </reviewer-report>
 ```
 
