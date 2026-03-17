@@ -16,6 +16,9 @@ set -e
 CONFIG_DIR="$HOME/.config/opencode"
 MODE="copy"
 
+# Files to exclude from backup and installation (runtime/generated files)
+EXCLUDE_FILES="opencode-notifier-state.json node_modules package.json bun.lock package-lock.json .gitignore"
+
 # Parse arguments
 for arg in "$@"; do
     case $arg in
@@ -67,7 +70,7 @@ if [ -d "$CONFIG_DIR" ]; then
         exit 1
     fi
     
-    for item in AGENTS.md agent command plugin skills tui.json rules; do
+    for item in AGENTS.md agent command plugin skills tui.json rules scripts; do
         if [ -e "$CONFIG_DIR/$item" ]; then
             if ! mv "$CONFIG_DIR/$item" "$BACKUP/" 2>/dev/null; then
                 echo "==> WARNING: Failed to backup '$item', skipping..."
@@ -78,6 +81,13 @@ if [ -d "$CONFIG_DIR" ]; then
     for cfg in opencode.jsonc opencode.json; do
         if [ -f "$CONFIG_DIR/$cfg" ]; then
             cp "$CONFIG_DIR/$cfg" "$BACKUP/$cfg" 2>/dev/null || true
+        fi
+    done
+    
+    # Remove runtime/generated files that should not exist
+    for exclude in $EXCLUDE_FILES; do
+        if [ -e "$CONFIG_DIR/$exclude" ]; then
+            rm -rf "$CONFIG_DIR/$exclude"
         fi
     done
 fi
@@ -335,7 +345,7 @@ PYEOF
     [ -f "$target_dir/opencode.json" ] && rm -f "$target_dir/opencode.json"
 }
 
-# Files and directories to install (excluding ref/, .planning/, .worktrees/, caches, etc.)
+# Files and directories to install
 INSTALL_ITEMS="AGENTS.md agent command plugin skills tui.json rules scripts"
 
 # Install
@@ -379,13 +389,20 @@ else
         for cfg in opencode.jsonc opencode.json; do
             [ -f "$CONFIG_DIR/$cfg" ] && rm -f "$CONFIG_DIR/$cfg"
         done
+        # Remove runtime/generated files
+        for exclude in $EXCLUDE_FILES; do
+            [ -e "$CONFIG_DIR/$exclude" ] && rm -rf "$CONFIG_DIR/$exclude"
+        done
         # Create symlink for opencode.jsonc
         if [ -f "$REPO_DIR/opencode.jsonc" ]; then
             ln -sf "$REPO_DIR/opencode.jsonc" "$CONFIG_DIR/opencode.jsonc"
         fi
-        # Link other files (ln -sf handles existing files/symlinks)
+        # Link directories (must remove first, ln -sf won't replace existing dirs)
         for item in $INSTALL_ITEMS; do
-            [ -e "$REPO_DIR/$item" ] && ln -sf "$REPO_DIR/$item" "$CONFIG_DIR/$item"
+            if [ -e "$REPO_DIR/$item" ]; then
+                [ -e "$CONFIG_DIR/$item" ] && rm -rf "$CONFIG_DIR/$item"
+                ln -sf "$REPO_DIR/$item" "$CONFIG_DIR/$item"
+            fi
         done
         echo "==> Done! Run 'cd $REPO_DIR && git pull' to update."
     else
@@ -408,13 +425,20 @@ else
         for cfg in opencode.jsonc opencode.json; do
             [ -f "$CONFIG_DIR/$cfg" ] && rm -f "$CONFIG_DIR/$cfg"
         done
+        # Remove runtime/generated files
+        for exclude in $EXCLUDE_FILES; do
+            [ -e "$CONFIG_DIR/$exclude" ] && rm -rf "$CONFIG_DIR/$exclude"
+        done
         # Create symlink for opencode.jsonc
         if [ -f "$REPO_DIR/opencode.jsonc" ]; then
             ln -sf "$REPO_DIR/opencode.jsonc" "$CONFIG_DIR/opencode.jsonc"
         fi
-        # Link other files (ln -sf handles existing files/symlinks)
+        # Link directories (must remove first, ln -sf won't replace existing dirs)
         for item in $INSTALL_ITEMS; do
-            [ -e "$REPO_DIR/$item" ] && ln -sf "$REPO_DIR/$item" "$CONFIG_DIR/$item"
+            if [ -e "$REPO_DIR/$item" ]; then
+                [ -e "$CONFIG_DIR/$item" ] && rm -rf "$CONFIG_DIR/$item"
+                ln -sf "$REPO_DIR/$item" "$CONFIG_DIR/$item"
+            fi
         done
         echo "==> Done! Run 'cd $REPO_DIR && git pull' to update."
     fi
