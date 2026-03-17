@@ -149,6 +149,11 @@ CONFIDENCE: high | medium | low
 - **P1** [F2] 移除 OAuth 实现，或在继续前通过 checkpoint 征得用户同意
 - **P1** [F3] 下次执行时严格按任务粒度提交，保持 git 历史可追溯性
 
+#### 严重性汇总
+- **[致命 Fatal]**：[P0 findings，或"无"]
+- **[重要 Important]**：[P1 findings，或"无"]
+- **[建议 Suggestion]**：[P2 findings，或"无"]
+
 </reviewer-report>
 ```
 

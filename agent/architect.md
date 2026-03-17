@@ -118,23 +118,11 @@ cat pyproject.toml 2>/dev/null | head -30
 
 | 探索级别 | 时机 | 行动 |
 |----------|------|------|
-| Level 0 - 无 | 遵循既定模式 | 跳过研究 |
+| Level 0 - 无 | 遵循既定模式 | 跳过研究，直接进入阶段 2.5 |
 | Level 1 - 快速 | 单一库验证 | 使用 context7 |
-| Level 2 - 标准 | 在选项间选择 | 委托给 @researcher |
-| Level 3 - 深入 | 架构决策 | 完整研究周期 |
+| Level 2+ - 标准/深入 | 在选项间选择 / 架构决策 | 将研究需求写入 design-request，由 @system-designer 内部路由（第零步会自动 spawn @researcher） |
 
-#### 2.2 委托研究
-
-对于 Level 2+ 研究，调用 @researcher：
-
-```
-@researcher
-
-问题: [具体的研究问题]
-上下文: [为什么这很重要]
-约束: [项目要求]
-标准: [评估因素]
-```
+**Level 2+ 不再直接调用 @researcher**，研究需求通过 `<design-request>` 传递给 @system-designer，由其第零步判断并统一调度。
 
 ---
 
@@ -178,8 +166,8 @@ cat pyproject.toml 2>/dev/null | head -30
 ## 已知决策
 [PROJECT.md 中的关键决策记录，若有]
 
-## 研究结论
-[阶段 2 研究的关键结论，若跳过研究则填写"无"]
+## 研究需求
+[若 Level 2+：描述需要研究的具体问题，@system-designer 将自动 spawn @researcher；若 Level 0/1 则填写"无需研究"]
 
 </design-request>
 ```
@@ -726,7 +714,7 @@ must_haves:
 
 ## 委托的 Subagent
 
-- **@researcher** - 技术研究和外部资源调查
+- **@system-designer** - 多维设计分析（内部可自动 spawn @researcher 进行代码库/技术研究）
 - **@explorer** (内置) - 代码库探索
 
 ---

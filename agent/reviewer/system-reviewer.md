@@ -129,6 +129,23 @@ normal：以上都不满足的默认值
 
 等待所有 @task 完成后，汇总 `<reviewer-report>` 块。
 
+#### 交付门控评估（delivery_gate）
+
+聚合所有 `<reviewer-report>` 的 **严重性汇总** 节后：
+
+```
+fatal_count = 所有 reviewer 报告中 [致命 Fatal] 非"无"的条目总数
+important_count = 所有 reviewer 报告中 [重要 Important] 非"无"的条目总数
+
+delivery_gate = "pass"  当且仅当  fatal_count = 0 AND important_count = 0
+delivery_gate = "fail"  否则
+```
+
+**修复后 re-review 策略（适用于 delivery_gate=fail 后的重新触发）：**
+- 默认：仅重跑报告了 Fatal 或 Important 项的 reviewer
+- 若本轮修复涉及跨模块架构变更（新增/删除导出、修改接口签名等）：自行升级为全量重跑
+- 在 `<system-advisory>` 的 **下次评审范围** 字段中注明本轮的 re-review 建议
+
 #### 去重规则
 
 同一问题被多个 reviewer 发现时：
@@ -206,14 +223,25 @@ qa-reviewer 和 impact-reviewer 在各自适用的路由中始终参与加权：
 
 ### 改进建议
 
-#### P0 - 需要关注（安全/正确性问题）
-- [合并后的 P0 条目，含文件路径]
+#### 致命 Fatal（必须修复，阻塞交付）
+- [合并后的 Fatal/P0 条目，含文件路径]
 
-#### P1 - 建议改进（质量/架构问题）
-- [合并后的 P1 条目]
+#### 重要 Important（必须修复，阻塞交付）
+- [合并后的 Important/P1 条目]
 
-#### P2 - 可选优化（创新/性能改进）
-- [合并后的 P2 条目]
+#### 建议 Suggestion（可选改进）
+- [合并后的 Suggestion/P2 条目]
+
+---
+
+### 交付门控
+
+**delivery_gate:** pass | fail
+**阻塞项（如有）:**
+- [Fatal] reviewer-id: 描述
+- [Important] reviewer-id: 描述
+
+**下次评审范围（仅 fail 时）:** [建议重跑的 reviewer 列表，或"全量"]
 
 </system-advisory>
 ```
@@ -265,8 +293,16 @@ qa-reviewer 和 impact-reviewer 在各自适用的路由中始终参与加权：
 
 ### 改进建议
 
-#### P0 - 需要关注（安全/正确性问题）
+#### 致命 Fatal（必须修复，阻塞交付）
 - 评审服务不可用，建议手动审查变更
+
+---
+
+### 交付门控
+
+**delivery_gate:** fail
+**阻塞项:** 评审服务不可用，无法确认交付安全
+**下次评审范围:** 全量
 
 </system-advisory>
 ```

@@ -541,10 +541,16 @@ mv .planning/phases/[phase]/[plan]-PLAN.md .planning/phases/[phase]/archive/
 </system-review-request>
 ```
 
-**收到 @system-reviewer 的 `<system-advisory>` 后：**
-- P0 建议（安全/正确性）：强烈建议处理
-- P1 建议（质量/架构）：视情况决定
-- P2 建议（优化/创新）：可记录到 backlog，不阻塞当前流程
+**收到 @system-reviewer 的 `<system-advisory>` 后，读取 `delivery_gate` 字段：**
+
+- `delivery_gate: pass` → 正常归档流程，可交付
+- `delivery_gate: fail` → **不归档**，进入修复循环：
+  1. 从 `<system-advisory>` 的 **阻塞项** 中提取所有 Fatal/Important 条目
+  2. 将阻塞项转为新的 task list，重新进入阶段 3 执行（@coder → @tester → @debugger）
+  3. 执行完成后，根据 `<system-advisory>` 的 **下次评审范围** 字段重新触发 @system-reviewer
+  4. 重复上述循环，**最多 3 轮**；超出 3 轮后停止，将剩余阻塞项报告给用户
+
+**Suggestion 建议（原 P2）：** 可记录到 SUMMARY.md backlog，不阻塞交付
 
 ---
 

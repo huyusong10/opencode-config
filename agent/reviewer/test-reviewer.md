@@ -94,6 +94,11 @@ grep -n "if.*null\|if.*undefined\|if.*length\|try {" [changed-source-files]
 - **P1** [F2] 添加 `parseConfig(null)` 和 `parseConfig({})` 的测试用例
 - **P1** [F3] 在 `afterEach` 中恢复 `process.env.NODE_ENV`
 
+#### 严重性汇总
+- **[致命 Fatal]**：[P0 findings，或"无"]
+- **[重要 Important]**：[P1 findings，或"无"]
+- **[建议 Suggestion]**：[P2 findings，或"无"]
+
 </reviewer-report>
 ```
 

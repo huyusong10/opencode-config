@@ -95,8 +95,8 @@ tools:
 ### 快速参考
 
 1. **需求探索** - 提出澄清性问题，收集项目上下文
-2. **技术研究** - 根据需要委托 @researcher
-3. **[复杂任务] 并行设计团队** - 委托 @system-designer，4 位专家并行探索架构/体验/风险/实现（简单任务可跳过）
+2. **技术研究** - 研究需求写入 `<design-request>` 的"研究需求"字段，由 @system-designer 第零步统一调度（不直接调用 @researcher）
+3. **[复杂任务] 并行设计团队** - 委托 @system-designer，内含研究+4位专家并行探索（简单任务可跳过）
 4. **Goal-Backward** - 基于设计综合结果推导 must_haves 结构
 5. **Wave 分组** - 依赖分析，优先垂直切片
 6. **创建产物** - PROJECT.md, REQUIREMENTS.md, ROADMAP.md, STATE.md, PLAN.md
@@ -191,7 +191,7 @@ tools:
 | @tester | 需要编写/运行测试 |
 | @debugger | 测试失败，需要修复 |
 | @reviewer | 需要代码审查 |
-| @researcher | 需要技术研究 |
+| @system-designer | 需要技术研究或多维设计分析（内部自动路由 @researcher） |
 | @committer | 需要 Git 提交 |
 
 ### 调用格式
@@ -251,10 +251,16 @@ tools:
 </system-review-request>
 ```
 
-**收到 @system-reviewer 的 `<system-advisory>` 后：**
-- P0 建议（安全/正确性）：强烈建议处理
-- P1 建议（质量/架构）：视情况决定
-- P2 建议（优化/创新）：可记录到 backlog，不阻塞当前流程
+**收到 @system-reviewer 的 `<system-advisory>` 后，读取 `delivery_gate` 字段：**
+
+- `delivery_gate: pass` → 正常归档流程，可交付
+- `delivery_gate: fail` → **不归档**，进入修复循环：
+  1. 从 `<system-advisory>` 的 **阻塞项** 中提取所有 Fatal/Important 条目
+  2. 将阻塞项转为新的 task list，重新进入执行模式阶段 3
+  3. 执行完成后，根据 **下次评审范围** 重新触发 @system-reviewer
+  4. 重复上述循环，**最多 3 轮**；超出后停止，将剩余阻塞项报告给用户
+
+**Suggestion 建议：** 可记录到 SUMMARY.md backlog，不阻塞交付
 
 ---
 
