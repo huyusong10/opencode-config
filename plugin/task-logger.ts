@@ -1,6 +1,6 @@
 import type { Plugin, PluginInput } from "@opencode-ai/plugin"
-import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync } from "fs"
-import { basename, dirname, extname, join } from "path"
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from "fs"
+import { join } from "path"
 
 type LogType =
   | "session_start"
@@ -9,8 +9,6 @@ type LogType =
   | "task_complete"
   | "test_run"
   | "commit"
-  | "hook_block"
-  | "hook_pass"
   | "error"
 
 interface TaskCompleteData {
@@ -139,12 +137,11 @@ async function getGitCommits(ctx: PluginInput, limit: number = 5): Promise<GitCo
   }
 }
 
-function parseStateFile(ctx: PluginInput, filePath?: string) {
-  const statePath = filePath || join(ctx.directory, ".planning", "STATE.md")
-  if (!existsSync(statePath)) return null
+function parseStateFile(filePath: string) {
+  if (!existsSync(filePath)) return null
 
   try {
-    const content = readFileSync(statePath, "utf-8")
+    const content = readFileSync(filePath, "utf-8")
     let phase = ""
     let plan = ""
     let task = ""
@@ -187,7 +184,7 @@ function writeLog(ctx: PluginInput, entry: LogEntry) {
   const sessionPrefix = entry.session.slice(0, 8)
   const targets: [string, string][] = [
     ["daily", join(dailyDir, `${dateStr}-${sessionPrefix}.jsonl`)],
-    ["session", join(sessionDir, `${entry.agent || "maker"}.jsonl`)],
+    ["session", join(sessionDir, `${entry.agent || "default"}.jsonl`)],
   ]
   if (entry.phase && entry.plan) {
     targets.push(["task", join(taskDir, `${entry.phase}-${entry.plan}.jsonl`)])
@@ -238,7 +235,7 @@ export const TaskLoggerPlugin: Plugin = async (ctx) => {
         const p = args?.filePath || args?.path || args?.file_path
         if (p && p.endsWith("STATE.md")) {
           const absPath = p.startsWith("/") ? p : join(ctx.directory, p)
-          const parsedState = parseStateFile(ctx, absPath)
+          const parsedState = parseStateFile(absPath)
           if (parsedState) {
             const currentPhase = state.activePhase
             const currentPlan = state.activePlan
@@ -253,7 +250,6 @@ export const TaskLoggerPlugin: Plugin = async (ctx) => {
                 ts: new Date().toISOString(),
                 type: "task_complete",
                 session: sid,
-                agent: "maker",
                 phase: currentPhase,
                 plan: currentPlan,
                 task: currentTask,
@@ -271,7 +267,6 @@ export const TaskLoggerPlugin: Plugin = async (ctx) => {
                 ts: new Date().toISOString(),
                 type: "task_start",
                 session: sid,
-                agent: "maker",
                 phase: parsedState.phase,
                 plan: parsedState.plan,
                 task: parsedState.task,
