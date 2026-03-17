@@ -42,9 +42,9 @@ cd ~/opencode-config && git pull
 
 ```
      Planning (wide)         Execution (narrow)          Review (wide)
-┌────────────────────┐   ┌──────────────────────┐   ┌────────────────────┐
+┌────────────────────┐   ┌───────────────────────┐   ┌────────────────────┐
 │    Design Team     │   │       Maestro         │   │   Reviewer Team    │
-│                    │   │  Auto-mode switching │   │                    │
+│                    │   │  Auto-mode switching  │   │                    │
 │ arch-designer      │──▶│  Planning Mode        │──▶│ arch-reviewer      │
 │ ux-designer        │   │  Execution Mode       │   │ security-reviewer  │
 │ risk-designer      │   │  Resume Mode          │   │ perf-reviewer      │
@@ -58,7 +58,7 @@ cd ~/opencode-config && git pull
 │ Output <design-    │   │  Fast Path: ≤2 files  │   │ Required, no skip  │
 │ synthesis>         │   │  Direct execute       │   │ Output <system-    │
 │ for Goal-Backward  │   │                       │   │ advisory>          │
-└────────────────────┘   └──────────────────────┘   └────────────────────┘
+└────────────────────┘   └───────────────────────┘   └────────────────────┘
          │                          │                          │
     Goal-Backward              Wave Dispatch              Quality Gate
     Goal-Backward method       Wave parallel/serial       Weighted X.X/5
@@ -184,11 +184,11 @@ Architect 负责理解需求、设计解决方案并创建可执行的开发计�
 │                                     ↓                                       │
 │  Phase 2.5: Design Team (complex tasks, barbell left end)                   │
 │  ┌─────────────────────────────────────────────────────────────────────┐    │
-│  │ - Emit <design-request> (goal + context + requirements + signals)  │    │
-│  │ - @system-designer dispatches 4 specialists in parallel:           │    │
-│  │   arch-designer | ux-designer | risk-designer | impl-designer      │    │
-│  │ - Collect <design-synthesis> with Goal-Backward inputs             │    │
-│  │ Skip if: single-file ≤20 lines / config/docs/typo / no arch choice │    │
+│  │ - Emit <design-request> (goal + context + requirements + signals)   │    │
+│  │ - @system-designer dispatches 4 specialists in parallel:            │    │
+│  │   arch-designer | ux-designer | risk-designer | impl-designer       │    │
+│  │ - Collect <design-synthesis> with Goal-Backward inputs              │    │
+│  │ Skip if: single-file ≤20 lines / config/docs/typo / no arch choice  │    │
 │  └─────────────────────────────────────────────────────────────────────┘    │
 │                                     ↓                                       │
 │  Phase 3: Planning                                                          │
@@ -247,7 +247,7 @@ Maker 负责执行 Architect 创建的计划，协调 subagent 并管理状态�
 │  Phase 3: Task Execution                                                    │
 │  ┌─────────────────────────────────────────────────────────────────────┐    │
 │  │ For each task:                                                      │    │
-│  │ - Fast Path Check: ≤2 files, ≤20 lines, no architecture impact?    │    │
+│  │ - Fast Path Check: ≤2 files, ≤20 lines, no architecture impact?     │    │
 │  │   Yes -> Maker direct execute -> verify -> commit                   │    │
 │  │   No  -> Delegate to subagent -> Two-stage review                   │    │
 │  │ - Verify completion -> @committer commit                            │    │
