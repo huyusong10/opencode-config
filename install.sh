@@ -106,7 +106,9 @@ merge_opencode_config() {
     
     # Try Python merge (preferred)
     if command -v python3 &>/dev/null; then
-        python3 << 'PYEOF' "$source_file" "$target_dir" "$output_file"
+        # Create temp Python script
+        PY_MERGE_SCRIPT=$(mktemp)
+        cat > "$PY_MERGE_SCRIPT" << 'PYEOF'
 import json
 import re
 import sys
@@ -288,6 +290,10 @@ if has_old_json and os.path.exists(existing_json):
     except Exception as e:
         print(f"WARNING: Failed to remove old opencode.json: {e}")
 PYEOF
+        
+        # Execute the merge script
+        python3 "$PY_MERGE_SCRIPT" "$source_file" "$target_dir" "$output_file"
+        rm -f "$PY_MERGE_SCRIPT"
         return $?
     fi
     
