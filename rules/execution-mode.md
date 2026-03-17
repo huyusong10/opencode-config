@@ -22,11 +22,11 @@
 | Mode | Flow | Use Case |
 |------|------|----------|
 | **ralph** (默认) | @coder → @tester → (pass? done : @debugger → loop) | 确定性验证循环 |
-| **tdd** | RED(@tester) → GREEN(@coder) → REFACTOR(@reviewer) | 测试驱动 |
-| **standard** | @coder → @reviewer → done | 常规开发 |
+| **tdd** | RED(@tester) → GREEN(@coder) → REFACTOR(@coder) | 测试驱动 |
+| **standard** | @coder → done | 常规开发 |
 | **spike** | @researcher → @coder → done | 技术原型 |
 | **debug** | @debugger → @tester → done | Bug 修复 |
-| **refactor** | @reviewer → @coder → @tester → done | 代码重构 |
+| **refactor** | @coder → @tester → done | 代码重构 |
 | **migrate** | @coder → @tester → done | 迁移任务 |
 
 ### 3. 快速通道

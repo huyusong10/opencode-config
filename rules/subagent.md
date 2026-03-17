@@ -5,7 +5,7 @@
 | Independent subtask | Clear boundaries, can complete independently | `@researcher` research technical feasibility |
 | Context isolation | Needs extensive exploration, avoid polluting main context | `@coder` batch execute independent tasks |
 | Specialized role | Requires domain knowledge or specific role | `@committer` handle git commits |
-| Read-only review | Needs impartial third-party perspective | `@reviewer` verify implementation matches spec |
+| Read-only review | Needs impartial third-party perspective | `@system-reviewer` end-of-plan delivery gate |
 
 ## When to Handle Directly
 
@@ -29,11 +29,13 @@ Needs context isolation or specialized role?
 
 ## Available Subagents
 
-| Subagent | Role |
-|----------|------|
-| `@coder` | Write/modify code per specification |
-| `@tester` | Write and run tests |
-| `@debugger` | Systematic bug diagnosis and fixes |
-| `@reviewer` | Code review for correctness and quality |
-| `@researcher` | Research technologies and patterns |
-| `@committer` | Atomic git commits with smart messages |
+| Subagent | Folder | Role |
+|----------|--------|------|
+| `@coder` | executor/ | Write/modify code per specification |
+| `@tester` | executor/ | Write and run tests |
+| `@debugger` | executor/ | Systematic bug diagnosis and fixes |
+| `@committer` | executor/ | Atomic git commits with smart messages |
+| `@fluid-worker` | executor/ | Zero-persona generic executor for Fluid |
+| `@researcher` | designer/ | Research technologies and patterns |
+| `@system-designer` | designer/ | Multi-perspective design orchestrator |
+| `@system-reviewer` | reviewer/ | End-of-plan delivery gate (routes to specialists) |
