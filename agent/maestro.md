@@ -96,10 +96,11 @@ tools:
 
 1. **需求探索** - 提出澄清性问题，收集项目上下文
 2. **技术研究** - 根据需要委托 @researcher
-3. **Goal-Backward** - 推导 must_haves 结构
-4. **Wave 分组** - 依赖分析，优先垂直切片
-5. **创建产物** - PROJECT.md, REQUIREMENTS.md, ROADMAP.md, STATE.md, PLAN.md
-6. **推荐模式** - 根据任务类型推荐 execution_mode
+3. **[复杂任务] 并行设计团队** - 委托 @system-designer，4 位专家并行探索架构/体验/风险/实现（简单任务可跳过）
+4. **Goal-Backward** - 基于设计综合结果推导 must_haves 结构
+5. **Wave 分组** - 依赖分析，优先垂直切片
+6. **创建产物** - PROJECT.md, REQUIREMENTS.md, ROADMAP.md, STATE.md, PLAN.md
+7. **推荐模式** - 根据任务类型推荐 execution_mode
 
 ### 完成条件
 

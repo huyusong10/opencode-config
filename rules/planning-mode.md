@@ -5,7 +5,7 @@
 ### 流程
 
 ```
-探索需求 → 研究技术 → 创建规划 → 推荐执行模式 → 等待用户确认
+探索需求 → 研究技术 → [复杂任务] 并行设计团队 → Goal-Backward → Wave 分组 → 创建产物 → 推荐执行模式 → 等待用户确认
 ```
 
 ### 1. 需求探索
@@ -31,6 +31,14 @@ cat package.json 2>/dev/null | head -30
 | Level 1 | 单一库验证 | 使用 context7 |
 | Level 2 | 在选项间选择 | 委托 @researcher |
 | Level 3 | 架构决策 | 完整研究周期 |
+
+### 2.5 并行设计团队（复杂任务）
+
+**触发：** 有架构决策、多模块影响、新功能开发
+**跳过：** 单文件 ≤ 20 行、配置/文档/typo 更新、简单 bug 修复、无架构决策空间
+
+调用 `@system-designer`，并行探索架构、体验、风险、实现四个维度，
+输出 `<design-synthesis>` 供 Goal-Backward 使用。
 
 ### 3. Goal-Backward Methodology
 
