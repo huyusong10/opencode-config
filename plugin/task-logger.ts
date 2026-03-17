@@ -139,8 +139,8 @@ async function getGitCommits(ctx: PluginInput, limit: number = 5): Promise<GitCo
   }
 }
 
-function parseStateFile(ctx: PluginInput) {
-  const statePath = join(ctx.directory, ".planning", "STATE.md")
+function parseStateFile(ctx: PluginInput, filePath?: string) {
+  const statePath = filePath || join(ctx.directory, ".planning", "STATE.md")
   if (!existsSync(statePath)) return null
 
   try {
@@ -171,8 +171,7 @@ function parseStateFile(ctx: PluginInput) {
 }
 
 function writeLog(ctx: PluginInput, entry: LogEntry) {
-  const planningDir = join(ctx.directory, ".planning")
-  const logsDir = join(planningDir, ".logs")
+  const logsDir = join(ctx.directory, ".log")
   const dailyDir = join(logsDir, "daily")
   const sessionDir = join(logsDir, "sessions", entry.session)
   const taskDir = join(logsDir, "tasks")
@@ -238,7 +237,8 @@ export const TaskLoggerPlugin: Plugin = async (ctx) => {
         const args = output?.args as any
         const p = args?.filePath || args?.path || args?.file_path
         if (p && p.endsWith("STATE.md")) {
-          const parsedState = parseStateFile(ctx)
+          const absPath = p.startsWith("/") ? p : join(ctx.directory, p)
+          const parsedState = parseStateFile(ctx, absPath)
           if (parsedState) {
             const currentPhase = state.activePhase
             const currentPlan = state.activePlan

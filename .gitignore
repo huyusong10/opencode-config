@@ -25,5 +25,8 @@ __pycache__/
 .planning/
 .ralph/
 
+# Task logger output (generated at runtime)
+.log/
+
 # Reference
 ref/
