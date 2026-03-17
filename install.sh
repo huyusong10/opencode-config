@@ -54,44 +54,6 @@ else
     fi
 fi
 
-# Backup existing config (keep config files for merging)
-if [ -d "$CONFIG_DIR" ]; then
-    BACKUP="$CONFIG_DIR/backup_$(date +%Y%m%d_%H%M%S)"
-    
-    # Check if backup directory already exists (rare edge case)
-    if [ -d "$BACKUP" ]; then
-        echo "==> WARNING: Backup directory already exists, appending timestamp..."
-        BACKUP="$CONFIG_DIR/backup_$(date +%Y%m%d_%H%M%S)_$$"
-    fi
-    
-    echo "==> Backing up existing config to $BACKUP"
-    if ! mkdir -p "$BACKUP" 2>/dev/null; then
-        echo "==> ERROR: Cannot create backup directory '$BACKUP'."
-        exit 1
-    fi
-    
-    for item in AGENTS.md agent command plugin skills tui.json rules scripts; do
-        if [ -e "$CONFIG_DIR/$item" ]; then
-            if ! mv "$CONFIG_DIR/$item" "$BACKUP/" 2>/dev/null; then
-                echo "==> WARNING: Failed to backup '$item', skipping..."
-            fi
-        fi
-    done
-    # Backup config files (copy, not move — keeps them in place for merging)
-    for cfg in opencode.jsonc opencode.json; do
-        if [ -f "$CONFIG_DIR/$cfg" ]; then
-            cp "$CONFIG_DIR/$cfg" "$BACKUP/$cfg" 2>/dev/null || true
-        fi
-    done
-    
-    # Remove runtime/generated files that should not exist
-    for exclude in $EXCLUDE_FILES; do
-        if [ -e "$CONFIG_DIR/$exclude" ]; then
-            rm -rf "$CONFIG_DIR/$exclude"
-        fi
-    done
-fi
-
 mkdir -p "$CONFIG_DIR" || {
     echo "==> ERROR: Cannot create config directory '$CONFIG_DIR'. Permission denied?"
     exit 1
@@ -351,6 +313,10 @@ INSTALL_ITEMS="AGENTS.md agent command plugin skills tui.json rules scripts"
 # Install
 if [ "$MODE" = "copy" ]; then
     echo "==> Copying files..."
+    # Remove runtime/generated files
+    for exclude in $EXCLUDE_FILES; do
+        [ -e "$CONFIG_DIR/$exclude" ] && rm -rf "$CONFIG_DIR/$exclude"
+    done
     if [ "$IS_GIT_REPO" = true ]; then
         # Handle opencode.jsonc separately for merging
         if [ -f "$REPO_DIR/opencode.jsonc" ]; then
@@ -383,24 +349,37 @@ if [ "$MODE" = "copy" ]; then
 else
     # Link mode - for debugging only
     echo "==> WARNING: Symlink mode is for debugging only. It may conflict with existing configs."
+    
+    # Backup existing config before replacing with symlinks
+    if [ -d "$CONFIG_DIR" ]; then
+        BACKUP="$CONFIG_DIR/backup_$(date +%Y%m%d_%H%M%S)"
+        if [ -d "$BACKUP" ]; then
+            BACKUP="$CONFIG_DIR/backup_$(date +%Y%m%d_%H%M%S)_$$"
+        fi
+        echo "==> Backing up existing config to $BACKUP"
+        mkdir -p "$BACKUP"
+        
+        for item in AGENTS.md agent command plugin skills tui.json rules scripts opencode.jsonc opencode.json; do
+            if [ -e "$CONFIG_DIR/$item" ]; then
+                mv "$CONFIG_DIR/$item" "$BACKUP/" 2>/dev/null || true
+            fi
+        done
+    fi
+    
+    # Remove runtime/generated files
+    for exclude in $EXCLUDE_FILES; do
+        [ -e "$CONFIG_DIR/$exclude" ] && rm -rf "$CONFIG_DIR/$exclude"
+    done
+    
     if [ "$IS_GIT_REPO" = true ]; then
         echo "==> Creating symlinks..."
-        # Remove existing config files before linking
-        for cfg in opencode.jsonc opencode.json; do
-            [ -f "$CONFIG_DIR/$cfg" ] && rm -f "$CONFIG_DIR/$cfg"
-        done
-        # Remove runtime/generated files
-        for exclude in $EXCLUDE_FILES; do
-            [ -e "$CONFIG_DIR/$exclude" ] && rm -rf "$CONFIG_DIR/$exclude"
-        done
         # Create symlink for opencode.jsonc
         if [ -f "$REPO_DIR/opencode.jsonc" ]; then
             ln -sf "$REPO_DIR/opencode.jsonc" "$CONFIG_DIR/opencode.jsonc"
         fi
-        # Link directories (must remove first, ln -sf won't replace existing dirs)
+        # Link directories
         for item in $INSTALL_ITEMS; do
             if [ -e "$REPO_DIR/$item" ]; then
-                [ -e "$CONFIG_DIR/$item" ] && rm -rf "$CONFIG_DIR/$item"
                 ln -sf "$REPO_DIR/$item" "$CONFIG_DIR/$item"
             fi
         done
@@ -421,22 +400,13 @@ else
                 exit 1
             fi
         fi
-        # Remove existing config files before linking
-        for cfg in opencode.jsonc opencode.json; do
-            [ -f "$CONFIG_DIR/$cfg" ] && rm -f "$CONFIG_DIR/$cfg"
-        done
-        # Remove runtime/generated files
-        for exclude in $EXCLUDE_FILES; do
-            [ -e "$CONFIG_DIR/$exclude" ] && rm -rf "$CONFIG_DIR/$exclude"
-        done
         # Create symlink for opencode.jsonc
         if [ -f "$REPO_DIR/opencode.jsonc" ]; then
             ln -sf "$REPO_DIR/opencode.jsonc" "$CONFIG_DIR/opencode.jsonc"
         fi
-        # Link directories (must remove first, ln -sf won't replace existing dirs)
+        # Link directories
         for item in $INSTALL_ITEMS; do
             if [ -e "$REPO_DIR/$item" ]; then
-                [ -e "$CONFIG_DIR/$item" ] && rm -rf "$CONFIG_DIR/$item"
                 ln -sf "$REPO_DIR/$item" "$CONFIG_DIR/$item"
             fi
         done
