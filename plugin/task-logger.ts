@@ -32,7 +32,8 @@ interface ErrorData {
   error: string
 }
 
-type LogData = Record<string, never> | TaskCompleteData | TestRunData | CommitData | ErrorData
+// Fix #9: Record<string, unknown> instead of Record<string, never>
+type LogData = Record<string, unknown> | TaskCompleteData | TestRunData | CommitData | ErrorData
 
 interface LogEntry {
   ts: string
@@ -58,12 +59,14 @@ interface GitDiffStats {
   lines_deleted: number
 }
 
-// Session-scoped states to track transitions
-const MAX_SESSIONS = 100 // Prevent unbounded memory growth
+// Session-scoped state: tracks active task context and whether any error
+// occurred during that task (used to derive task_complete status)
+const MAX_SESSIONS = 100
 const sessionStates = new Map<string, {
-  activeTask: string;
-  activePhase: string;
-  activePlan: string;
+  activeTask: string
+  activePhase: string
+  activePlan: string
+  taskHadError: boolean  // Fix #3: track errors to derive meaningful status
 }>()
 
 function getSessionState(sessionId: string) {
@@ -73,7 +76,7 @@ function getSessionState(sessionId: string) {
   }
   let state = sessionStates.get(sessionId)
   if (!state) {
-    state = { activeTask: "", activePhase: "", activePlan: "" }
+    state = { activeTask: "", activePhase: "", activePlan: "", taskHadError: false }
     sessionStates.set(sessionId, state)
   }
   return state
@@ -83,28 +86,24 @@ function cleanupSessionState(sessionId: string) {
   sessionStates.delete(sessionId)
 }
 
-async function getGitDiffStats(ctx: PluginInput, sinceCommit?: string): Promise<GitDiffStats> {
+// Fix #1: use --numstat for exact added/deleted counts (--stat truncates to terminal width)
+async function getGitDiffStats(ctx: PluginInput): Promise<GitDiffStats> {
   try {
-    const baseRef = sinceCommit || "HEAD~1"
-    const result = await ctx.$`git diff --stat ${baseRef}`
+    const result = await ctx.$`git diff --numstat HEAD~1`
     const output = result.stdout.trim()
 
-    if (!output) {
-      return { files_changed: [], lines_added: 0, lines_deleted: 0 }
-    }
+    if (!output) return { files_changed: [], lines_added: 0, lines_deleted: 0 }
 
-    const lines = output.split("\n")
     const filesChanged: string[] = []
     let linesAdded = 0
     let linesDeleted = 0
 
-    for (const line of lines) {
-      const fileMatch = line.match(/^\s*(.+?)\s*\|\s*(\d+)\s*([+-]+)/)
-      if (fileMatch) {
-        filesChanged.push(fileMatch[1].trim())
-        const changeStr = fileMatch[3] || ""
-        linesAdded += (changeStr.match(/\+/g) || []).length
-        linesDeleted += (changeStr.match(/-/g) || []).length
+    for (const line of output.split("\n")) {
+      const parts = line.split("\t")
+      if (parts.length >= 3) {
+        linesAdded += parseInt(parts[0] || "0", 10) || 0
+        linesDeleted += parseInt(parts[1] || "0", 10) || 0
+        filesChanged.push(parts[2].trim())
       }
     }
 
@@ -115,15 +114,16 @@ async function getGitDiffStats(ctx: PluginInput, sinceCommit?: string): Promise<
   }
 }
 
+// Fix #4: use NUL byte as separator so commit messages with special chars parse correctly
 async function getGitCommits(ctx: PluginInput, limit: number = 5): Promise<GitCommitInfo[]> {
   try {
-    const result = await ctx.$`git log --pretty=format:"%H|_%s|_%an|_%aI" -n ${limit}`
+    const result = await ctx.$`git log --pretty=format:"%H%x00%s%x00%an%x00%aI" -n ${limit}`
     const output = result.stdout.trim()
 
     if (!output) return []
 
     return output.split("\n").map(line => {
-      const parts = line.split("|_")
+      const parts = line.split("\x00")
       return {
         hash: parts[0] || "",
         message: parts[1] || "",
@@ -137,6 +137,7 @@ async function getGitCommits(ctx: PluginInput, limit: number = 5): Promise<GitCo
   }
 }
 
+// Fix #2: only split on the first colon so values containing ":" are preserved
 function parseStateFile(filePath: string) {
   if (!existsSync(filePath)) return null
 
@@ -146,81 +147,95 @@ function parseStateFile(filePath: string) {
     let plan = ""
     let task = ""
 
-    const lines = content.split("\n")
-    for (const line of lines) {
+    for (const line of content.split("\n")) {
       const trimmed = line.trim()
-      if (trimmed.startsWith("阶段:") || trimmed.includes("current_phase:")) {
-        phase = trimmed.split(":").pop()?.trim() || phase
-      }
-      if (trimmed.startsWith("计划:") || trimmed.includes("current_plan:")) {
-        plan = trimmed.split(":").pop()?.trim() || plan
-      }
-      if (trimmed.startsWith("任务:") || trimmed.includes("current_task:")) {
-        task = trimmed.split(":").pop()?.trim() || task
-      }
+      const colonIdx = trimmed.indexOf(":")
+      if (colonIdx === -1) continue
+      const key = trimmed.slice(0, colonIdx).trim()
+      const value = trimmed.slice(colonIdx + 1).trim()
+
+      if (key === "阶段" || key === "current_phase") phase = value || phase
+      if (key === "计划" || key === "current_plan") plan = value || plan
+      if (key === "任务" || key === "current_task") task = value || task
     }
 
     return { phase, plan, task }
   } catch (err) {
-    console.error(`[task-logger] Failed to parse STATE.md: ${err}`)
+    console.error(`[task-logger] Failed to parse state file: ${err}`)
     return null
   }
 }
 
-function writeLog(ctx: PluginInput, entry: LogEntry) {
+export const TaskLoggerPlugin: Plugin = async (ctx) => {
+  // Fix #8: create stable directories once at init; only session dirs are created on demand
   const logsDir = join(ctx.directory, ".log")
-  const dailyDir = join(logsDir, "daily")
-  const sessionDir = join(logsDir, "sessions", entry.session)
-  const taskDir = join(logsDir, "tasks")
+  mkdirSync(join(logsDir, "daily"), { recursive: true })
+  mkdirSync(join(logsDir, "tasks"), { recursive: true })
 
-  if (!existsSync(dailyDir)) mkdirSync(dailyDir, { recursive: true })
-  if (!existsSync(sessionDir)) mkdirSync(sessionDir, { recursive: true })
-  if (!existsSync(taskDir)) mkdirSync(taskDir, { recursive: true })
+  function writeLog(entry: LogEntry) {
+    // Session directory is dynamic — create on first write for that session
+    const sessionDir = join(logsDir, "sessions", entry.session)
+    if (!existsSync(sessionDir)) mkdirSync(sessionDir, { recursive: true })
 
-  const dateStr = new Date().toISOString().split("T")[0]
-  const line = JSON.stringify(entry) + "\n"
+    const dateStr = new Date().toISOString().split("T")[0]
+    const line = JSON.stringify(entry) + "\n"
+    const sessionPrefix = entry.session.slice(0, 8)
 
-  // Use session-scoped daily log files to avoid concurrent write conflicts
-  const sessionPrefix = entry.session.slice(0, 8)
-  const targets: [string, string][] = [
-    ["daily", join(dailyDir, `${dateStr}-${sessionPrefix}.jsonl`)],
-    ["session", join(sessionDir, `${entry.agent || "default"}.jsonl`)],
-  ]
-  if (entry.phase && entry.plan) {
-    targets.push(["task", join(taskDir, `${entry.phase}-${entry.plan}.jsonl`)])
-  }
+    const targets: [string, string][] = [
+      ["daily", join(logsDir, "daily", `${dateStr}-${sessionPrefix}.jsonl`)],
+      ["session", join(sessionDir, `${entry.agent || "default"}.jsonl`)],
+    ]
+    if (entry.phase && entry.plan) {
+      targets.push(["task", join(logsDir, "tasks", `${entry.phase}-${entry.plan}.jsonl`)])
+    }
 
-  for (const [label, path] of targets) {
-    try {
-      appendFileSync(path, line)
-    } catch (err) {
-      console.error(`[task-logger] Failed to write ${label} log to ${path}: ${err}`)
+    for (const [label, path] of targets) {
+      try {
+        appendFileSync(path, line)
+      } catch (err) {
+        console.error(`[task-logger] Failed to write ${label} log to ${path}: ${err}`)
+      }
     }
   }
-}
 
-export const TaskLoggerPlugin: Plugin = async (ctx) => {
+  // Shared helper: flush the active task as task_complete then clear state
+  async function flushActiveTask(sid: string, state: ReturnType<typeof getSessionState>) {
+    if (!state.activeTask) return
+    const gitStats = await getGitDiffStats(ctx)
+    const commits = await getGitCommits(ctx, 3)
+    writeLog({
+      ts: new Date().toISOString(),
+      type: "task_complete",
+      session: sid,
+      phase: state.activePhase,
+      plan: state.activePlan,
+      task: state.activeTask,
+      data: {
+        lines_added: gitStats.lines_added,
+        lines_deleted: gitStats.lines_deleted,
+        commits,
+        status: state.taskHadError ? "fail" : "pass",  // Fix #3
+      }
+    })
+  }
+
   return {
     event: async ({ event }) => {
       if (event.type === "session.created") {
         const props = event.properties as any
         const sid = props?.info?.id || "unknown"
-        writeLog(ctx, {
-          ts: new Date().toISOString(),
-          type: "session_start",
-          session: sid,
-          data: {}
-        })
+        writeLog({ ts: new Date().toISOString(), type: "session_start", session: sid, data: {} })
+
       } else if (event.type === "session.deleted") {
         const props = event.properties as any
         const sid = props?.info?.id || "unknown"
+        const state = getSessionState(sid)
+
+        // Fix #7: flush any active task before the session ends
+        await flushActiveTask(sid, state)
+
         cleanupSessionState(sid)
-        writeLog(ctx, {
-          ts: new Date().toISOString(),
-          type: "session_end",
-          session: sid,
-          data: {}
-        })
+        writeLog({ ts: new Date().toISOString(), type: "session_end", session: sid, data: {} })
       }
     },
 
@@ -229,84 +244,74 @@ export const TaskLoggerPlugin: Plugin = async (ctx) => {
       const state = getSessionState(sid)
       const tool = input.tool?.toLowerCase()
 
-      // Auto-track state transitions by diffing STATE.md reads
+      // Track task transitions via any STATE.md write
       if (tool === "write" || tool === "edit") {
         const args = output?.args as any
         const p = args?.filePath || args?.path || args?.file_path
         if (p && p.endsWith("STATE.md")) {
           const absPath = p.startsWith("/") ? p : join(ctx.directory, p)
-          const parsedState = parseStateFile(absPath)
-          if (parsedState) {
-            const currentPhase = state.activePhase
-            const currentPlan = state.activePlan
-            const currentTask = state.activeTask
+          const parsed = parseStateFile(absPath)
+          if (parsed) {
+            const { activeTask, activePhase, activePlan } = state
 
-            // If task changed or is new, complete old and start new
-            if (currentTask && currentTask !== parsedState.task) {
-              const gitStats = await getGitDiffStats(ctx)
-              const commits = await getGitCommits(ctx, 3)
-
-              writeLog(ctx, {
-                ts: new Date().toISOString(),
-                type: "task_complete",
-                session: sid,
-                phase: currentPhase,
-                plan: currentPlan,
-                task: currentTask,
-                data: {
-                  lines_added: gitStats.lines_added,
-                  lines_deleted: gitStats.lines_deleted,
-                  commits,
-                  status: "pass"
-                }
-              })
+            if (activeTask && activeTask !== parsed.task) {
+              await flushActiveTask(sid, state)
             }
 
-            if (parsedState.task && currentTask !== parsedState.task) {
-              writeLog(ctx, {
+            if (parsed.task && activeTask !== parsed.task) {
+              state.taskHadError = false  // reset error flag for new task
+              writeLog({
                 ts: new Date().toISOString(),
                 type: "task_start",
                 session: sid,
-                phase: parsedState.phase,
-                plan: parsedState.plan,
-                task: parsedState.task,
+                phase: parsed.phase,
+                plan: parsed.plan,
+                task: parsed.task,
                 data: {}
               })
             }
 
-            state.activePhase = parsedState.phase
-            state.activePlan = parsedState.plan
-            state.activeTask = parsedState.task
+            state.activePhase = parsed.phase
+            state.activePlan = parsed.plan
+            state.activeTask = parsed.task
           }
         }
       }
 
-      // Auto-track bash commands: tests and commits
+      // Track bash commands: git commits and test runs
+      // Fix #5: commands tracked here are NOT re-logged as generic errors below
+      let bashHandled = false
       if (tool === "bash") {
         const args = output?.args as any
         const cmd = args?.command || ""
+
         if (cmd.includes("git commit")) {
-          writeLog(ctx, {
+          writeLog({
             ts: new Date().toISOString(),
             type: "commit",
             session: sid,
             task: state.activeTask,
             data: { command: cmd, output: output?.output }
           })
+          bashHandled = true
         }
+
         if (cmd.includes("npm test") || cmd.includes("vitest") || cmd.includes("jest")) {
-          writeLog(ctx, {
+          writeLog({
             ts: new Date().toISOString(),
             type: "test_run",
             session: sid,
             task: state.activeTask,
             data: { command: cmd, success: !output.error }
           })
+          bashHandled = true
         }
       }
 
-      if (output?.error) {
-        writeLog(ctx, {
+      // Log unexpected errors; skip if already captured by a specific handler above
+      if (output?.error && !bashHandled) {
+        state.taskHadError = true  // Fix #3: mark task as failed
+        writeLog({
           ts: new Date().toISOString(),
           type: "error",
           session: sid,
@@ -318,4 +323,4 @@ export const TaskLoggerPlugin: Plugin = async (ctx) => {
   }
 }
 
-export default TaskLoggerPlugin;
+export default TaskLoggerPlugin
