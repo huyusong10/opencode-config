@@ -391,32 +391,32 @@ console.assert(condition, 'Assumption failed: ...');
 ### 流程
 
 ```
-验证失败
+Validation failed
     │
     ▼
-读取完整错误输出
+Read full error output
     │
     ▼
-调用 @debugger
+Call @debugger
     │
-    ├── Phase 1: 根因调查
-    │   - 阅读错误信息
-    │   - 稳定复现
-    │   - 追踪数据流
+    ├── Phase 1: Root Cause Investigation
+    │   - Read error messages
+    │   - Reproduce reliably
+    │   - Trace data flow
     │
-    ├── Phase 2: 模式分析
-    │   - 找到工作的示例
-    │   - 识别差异
+    ├── Phase 2: Pattern Analysis
+    │   - Find working example
+    │   - Identify differences
     │
-    ├── Phase 3: 假设与测试
-    │   - 形成可证伪假设
-    │   - 设计实验
-    │   - 验证假设
+    ├── Phase 3: Hypothesis & Testing
+    │   - Form falsifiable hypothesis
+    │   - Design experiment
+    │   - Verify hypothesis
     │
-    └── Phase 4: 实施
-        - 创建失败测试用例
-        - 实现最小修复
-        - 验证修复有效
+    └── Phase 4: Implementation
+        - Create failing test case
+        - Implement minimal fix
+        - Verify fix works
     │
     ▼
 重新运行验证命令
