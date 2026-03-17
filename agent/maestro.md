@@ -215,7 +215,7 @@ tools:
 
 ## 系统工程师触发
 
-**在归档完成后，可选择输出系统评审请求标签，触发 @system-engineer 进行系统级深度思考。@system-engineer 的输出为建议性报告，你自行决定是否采纳。**
+**在归档完成后，可选择输出系统评审请求标签，触发 @system-reviewer 组建评审团队进行系统级深度分析。@system-reviewer 的输出为建议性报告，你自行决定是否采纳。**
 
 **适合触发的场景：**
 - 涉及架构变更或新模块
@@ -252,7 +252,7 @@ tools:
 </system-review-request>
 ```
 
-**收到 @system-engineer 的 `<system-advisory>` 后：**
+**收到 @system-reviewer 的 `<system-advisory>` 后：**
 - P0 建议（安全/正确性）：强烈建议处理
 - P1 建议（质量/架构）：视情况决定
 - P2 建议（优化/创新）：可记录到 backlog，不阻塞当前流程

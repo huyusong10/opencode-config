@@ -312,8 +312,8 @@ export const SystemLoopPlugin: Plugin = async ({ directory, client }) => {
           }
           writeLoopState(directory, loopState)
 
-          // Trigger system engineer for advisory review
-          await triggerSystemEngineer(sessionId, reviewContext, client)
+          // Trigger system reviewer team for advisory review
+          await triggerSystemReviewer(sessionId, reviewContext, client)
           return
         }
 
@@ -342,12 +342,12 @@ export const SystemLoopPlugin: Plugin = async ({ directory, client }) => {
 // Helper Functions
 // ============================================================================
 
-async function triggerSystemEngineer(
+async function triggerSystemReviewer(
   sessionId: string,
   context: string,
   client: SystemLoopClient
 ): Promise<void> {
-  const prompt = `@system-engineer
+  const prompt = `@system-reviewer
 
 ## 系统评审请求
 
@@ -367,7 +367,7 @@ ${context}
   await client.app.log({
     service: "system-loop",
     level: "info",
-    message: "Triggered system-engineer for advisory review"
+    message: "Triggered system-reviewer for advisory review"
   })
 }
 
@@ -390,7 +390,7 @@ async function handleAdvisory(
 
 **评分:** ${advisory.score}/5
 
-以上为 @system-engineer 的建议报告，供参考。如需根据建议进行改进，请自行决定。`
+以上为 @system-reviewer 评审团队的建议报告，供参考。如需根据建议进行改进，请自行决定。`
 
   await client.session.send({
     id: sessionId,
