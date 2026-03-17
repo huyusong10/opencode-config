@@ -77,10 +77,25 @@ cd ~/opencode-config && git pull
 | @coder | 根据规格说明实现代码 | 读写 |
 | @tester | 编写和运行测试验证实现 | 读写 + PTY |
 | @debugger | 系统性诊断和修复 bug | 读写 + PTY |
-| @reviewer | 审查代码正确性和质量 | 只读 |
+| @reviewer | 审查代码规格合规与质量（执行流内） | 只读 |
 | @researcher | 研究技术、模式和解决方案 | 只读 |
 | @committer | 原子化 git 提交 | 只读 + bash |
-| @system-engineer | 系统级深度思考和架构分析 (温度 0.7) | 只读 |
+
+### 系统评审团队（System Reviewer Team）
+
+由 `@system-reviewer` 编排，在每次归档/规划完成后**强制触发**：
+
+| Reviewer | 职责 |
+|----------|------|
+| system-reviewer | 编排者：上下文路由、并行派发、结果汇总 |
+| arch-reviewer | 架构与模块边界审查 |
+| security-reviewer | 安全漏洞审查（OWASP Top 10）|
+| perf-reviewer | 性能与 I/O 效率审查 |
+| test-reviewer | 测试覆盖与质量审查 |
+| maintain-reviewer | 可维护性与代码气味审查 |
+| api-reviewer | 接口设计与契约审查 |
+| impact-reviewer | 现有功能影响分析（变更波及范围）|
+| qa-reviewer | 规则遵从度审查，**强制**，所有路由均派发 |
 
 ### 执行模式选择
 
@@ -204,101 +219,48 @@ Maker 负责执行 Architect 创建的计划，协调 subagent 并管理状态�
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Debugger 工作流
+### System Reviewer Workflow
 
-当遇到 bug、测试失败或意外行为时，使用 @debugger 进行系统性调试。
+在 Architect/Maker/Maestro 完成每次规划或执行归档后**强制触发**，不可跳过。小改动自动路由到轻量级评审。
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                          Debugger Workflow                                  │
+│                       System Reviewer Workflow                              │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
-│  Phase 1: Root Cause Investigation                                          │
-│  ┌─────────────────────────────────────────────────────────────────────┐    │
-│  │ - Read error messages (full stack trace)                            │    │
-│  │ - Reproduce the issue reliably                                      │    │
-│  │ - Check recent changes (git diff, git log)                          │    │
-│  │ - Multi-component systems: collect boundary evidence                │    │
-│  │ - Trace data flow to the source                                     │    │
-│  └─────────────────────────────────────────────────────────────────────┘    │
-│                                     ↓                                       │
-│  Phase 2: Pattern Analysis                                                  │
-│  ┌─────────────────────────────────────────────────────────────────────┐    │
-│  │ - Find working example code                                         │    │
-│  │ - Compare with reference implementation                             │    │
-│  │ - Identify differences                                              │    │
-│  │ - Understand dependencies                                           │    │
-│  └─────────────────────────────────────────────────────────────────────┘    │
-│                                     ↓                                       │
-│  Phase 3: Hypothesis & Testing                                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐    │
-│  │ - Form single hypothesis ("I think X is root cause because Y")      │    │
-│  │ - Minimal verification test                                         │    │
-│  │ - Valid -> Phase 4 / Invalid -> new hypothesis                      │    │
-│  │ - 3+ failures -> Question the architecture                          │    │
-│  └─────────────────────────────────────────────────────────────────────┘    │
-│                                     ↓                                       │
-│  Phase 4: Implementation                                                    │
-│  ┌─────────────────────────────────────────────────────────────────────┐    │
-│  │ - Create failing test case (must have test before fix)              │    │
-│  │ - Implement single fix (address root cause, not symptom)            │    │
-│  │ - Verify fix works                                                  │    │
-│  │ - Check for regressions                                             │    │
-│  └─────────────────────────────────────────────────────────────────────┘    │
-│                                                                             │
-│  Iron Rule: NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST                 │
+│  Primary Agent 完成规划/执行，输出 <system-review-request> tag（必须）      │
+│       |                                                                     │
+│       v                                                                     │
+│  system-loop plugin 检测到 tag，触发 @system-reviewer                       │
+│       |                                                                     │
+│       v                                                                     │
+│  system-reviewer 分析上下文，自动路由：                                     │
+│  +---------------------------------------------------------------------+    │
+│  | planning context  → arch + security + api + qa                      |    │
+│  | execution/arch_change → 全部 8 个专项（含 impact + qa）              |    │
+│  | execution/normal  → arch + security + test + maintain + impact + qa |    │
+│  | execution/small_change → maintain + test + impact + qa（轻量）      |    │
+│  +---------------------------------------------------------------------+    │
+│       |                                                                     │
+│       v                                                                     │
+│  并行派发：@task(subagent: xxx, parallel: true) × N                         │
+│  每个专项返回 <reviewer-report id="xxx">                                    │
+│       |                                                                     │
+│       v                                                                     │
+│  system-reviewer 汇总：去重、强制 P0 覆盖、加权评分                          │
+│       |                                                                     │
+│       v                                                                     │
+│  输出 <system-advisory>（含 **总分** X.X/5）                                │
+│  Primary Agent 收到建议，自行决定是否采纳                                   │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### System Engineer Workflow
-
-在 Maestro/Architect/Maker 完成主要工作后，自动触发系统级深度思考。
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                       System Engineer Workflow                               │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  Primary Agent completes work                                               │
-│       |                                                                     │
-│       v                                                                     │
-│  Output: <system-review-request> tag                                        │
-│       |                                                                     │
-│       v                                                                     │
-│  system-loop plugin detects tag on session.idle                             │
-│       |                                                                     │
-│       +-- Skip tag detected? -> End                                         │
-│       |                                                                     │
-│       v                                                                     │
-│  Trigger @system-engineer (temperature 0.7, read-only)                      │
-│       |                                                                     │
-│       v                                                                     │
-│  System Analysis:                                                           │
-│  +---------------------------------------------------------------------+    │
-│  | - Architecture consistency (30%)                                    |    │
-│  | - Design quality (25%)                                              |    │
-│  | - Code quality (25%)                                                |    │
-│  | - Security (20%)                                                    |    │
-│  +---------------------------------------------------------------------+    │
-│       |                                                                     │
-│       v                                                                     │
-│  Output: <system-feedback decision="continue|done">                         │
-│       |                                                                     │
-│       +-- decision="done" -> Clean up, complete                             │
-│       |                                                                     │
-│       +-- decision="continue" AND iteration < max -> Inject prompt, iterate │
-│       |                                                                     │
-│       +-- iteration >= max (default 3) -> Complete with summary             │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-**特性：**
-- 温度 0.7，具有创新性，能提出有价值建议
-- 只读权限，保持客观性
-- 自动迭代直到评分 >= 3.5/5 或达到最大迭代次数
-- 支持跳过标签：`skip-system-review`, `quick-fix`, `docs-only`
+**强制 P0 规则：**
+- `security`: INJECTION / SENSITIVE_DATA → P0
+- `api`: BREAKING_CHANGE → P0
+- `impact`: CALLER_BREAK → P0
+- `qa`: DEVIATION_VIOLATION / CHECKPOINT_MISSING / VALIDATION_SKIPPED / REQUIREMENT_MISSED → P0
 
 ---
 
@@ -332,12 +294,6 @@ BEFORE claiming any status:
 3. READ: Full output, check exit code
 4. VERIFY: Does output confirm the claim?
 5. ONLY THEN: Make the claim
-```
-
-### 调试铁律
-
-```
-NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST
 ```
 
 ### 提交铁律
@@ -377,7 +333,7 @@ NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST
 
 ```
 opencode-config/
-├── opencode.json          # 主配置（provider、model、mcp）
+├── opencode.jsonc         # 主配置（provider、model、mcp、plugins、instructions）
 ├── tui.json               # TUI 主题配置
 ├── AGENTS.md              # AI 行为偏好
 ├── install.sh             # 安装脚本
@@ -385,14 +341,23 @@ opencode-config/
 │   ├── maestro.md         # 统一 Agent（推荐）
 │   ├── architect.md       # 架构师 Agent（向后兼容）
 │   ├── maker.md           # 制造者 Agent（向后兼容）
-│   └── subagent/          # 功能型子代理
-│       ├── coder.md
-│       ├── tester.md
-│       ├── debugger.md
-│       ├── reviewer.md
-│       ├── researcher.md
-│       ├── committer.md
-│       └── system-engineer.md  # 系统工程师
+│   ├── subagent/          # 执行流功能型子代理
+│   │   ├── coder.md
+│   │   ├── tester.md
+│   │   ├── debugger.md
+│   │   ├── reviewer.md    # 执行流规格合规审查
+│   │   ├── researcher.md
+│   │   └── committer.md
+│   └── reviewer/          # 系统评审团队（归档后触发）
+│       ├── system-reviewer.md   # 编排者
+│       ├── arch-reviewer.md     # 架构与模块边界
+│       ├── security-reviewer.md # 安全漏洞（OWASP）
+│       ├── perf-reviewer.md     # 性能与 I/O
+│       ├── test-reviewer.md     # 测试覆盖与质量
+│       ├── maintain-reviewer.md # 可维护性
+│       ├── api-reviewer.md      # 接口设计与契约
+│       ├── impact-reviewer.md   # 现有功能影响分析
+│       └── qa-reviewer.md       # 规则遵从度（强制）
 ├── command/               # 自定义 Command 定义
 ├── skills/
 │   └── ralph-loop/        # Ralph Loop 技能
@@ -401,9 +366,9 @@ opencode-config/
 │   ├── deep-explore-prompts.yaml
 │   ├── ralph.ts                # Ralph Loop 插件
 │   ├── task-logger.ts          # 任务自动日志记录插件
-│   ├── system-loop.ts          # 系统工程师迭代插件
-│   └── system-loop-config.yaml # 系统工程师配置
-├── rules/                 # 补充规则
+│   ├── system-loop.ts          # 系统评审触发插件
+│   └── system-loop-config.yaml # 系统评审配置
+├── rules/                 # 补充规则（自动加载到所有 agent 上下文）
 │   ├── ascii-diagrams.md
 │   ├── codeact.md
 │   ├── subagent.md
@@ -411,8 +376,7 @@ opencode-config/
 │   ├── checkpoint-system.md # Checkpoint 系统
 │   ├── state-validation.md  # STATE.md 验证
 │   ├── planning-mode.md     # 规划模式
-│   ├── execution-mode.md    # 执行模式
-│   └── system-engineer-trigger.md  # 系统工程师触发规则
+│   └── execution-mode.md    # 执行模式
 ├── .log/                  # 任务日志目录（运行时生成，task-logger 插件写入）
 └── .planning/             # 项目规划目录（运行时生成）
     ├── PROJECT.md
