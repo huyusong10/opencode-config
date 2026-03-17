@@ -215,7 +215,16 @@ tools:
 
 ## 系统工程师触发
 
-**在归档完成后，输出系统评审请求标签触发 @system-engineer 进行系统级深度思考：**
+**在归档完成后，可选择输出系统评审请求标签，触发 @system-engineer 进行系统级深度思考。@system-engineer 的输出为建议性报告，你自行决定是否采纳。**
+
+**适合触发的场景：**
+- 涉及架构变更或新模块
+- 跨服务逻辑、复杂业务流程
+- 对当前方案有疑虑时
+
+**可跳过的场景：**
+- 快速通道任务（小范围修改）
+- 纯文档更新、配置微调、typo 修复
 
 ```markdown
 <system-review-request>
@@ -243,13 +252,10 @@ tools:
 </system-review-request>
 ```
 
-**跳过条件：** 以下情况使用 `<!-- skip-system-review -->` 跳过系统评审：
-- 快速通道任务（小范围修改）
-- 纯文档更新
-- 配置文件微调
-- typo 修复
-
-**详细规则参见：** `rules/system-engineer-trigger.md`
+**收到 @system-engineer 的 `<system-advisory>` 后：**
+- P0 建议（安全/正确性）：强烈建议处理
+- P1 建议（质量/架构）：视情况决定
+- P2 建议（优化/创新）：可记录到 backlog，不阻塞当前流程
 
 ---
 

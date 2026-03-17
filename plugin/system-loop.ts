@@ -64,13 +64,8 @@ interface LoopState {
   context: string
 }
 
-interface SystemFeedback {
-  decision: "continue" | "done"
-  iteration: number
-  summary: string
-  mustFix: string[]
-  suggestions: string[]
-  innovations: string[]
+interface SystemAdvisory {
+  content: string
   score: number
 }
 
@@ -83,8 +78,8 @@ const CONFIG_FILE = "system-loop-config.yaml"
 
 const TAG_REVIEW_REQUEST = "<system-review-request>"
 const TAG_REVIEW_REQUEST_END = "</system-review-request>"
-const TAG_FEEDBACK = /<system-feedback\s+decision="(continue|done)"\s+iteration="(\d+)"/
-const TAG_FEEDBACK_END = "</system-feedback>"
+const TAG_ADVISORY = "<system-advisory>"
+const TAG_ADVISORY_END = "</system-advisory>"
 
 // ============================================================================
 // Configuration
@@ -232,59 +227,19 @@ function extractReviewRequest(text: string): string | null {
     .trim()
 }
 
-function parseSystemFeedback(text: string): SystemFeedback | null {
-  const startMatch = text.match(TAG_FEEDBACK)
-  if (!startMatch) return null
+function parseSystemAdvisory(text: string): SystemAdvisory | null {
+  const startIdx = text.indexOf(TAG_ADVISORY)
+  const endIdx = text.indexOf(TAG_ADVISORY_END, startIdx)
 
-  const startIdx = startMatch.index!
-  const endIdx = text.indexOf(TAG_FEEDBACK_END, startIdx)
+  if (startIdx === -1 || endIdx === -1) return null
 
-  if (endIdx === -1) return null
-
-  const decision = startMatch[1] as "continue" | "done"
-  const iteration = parseInt(startMatch[2], 10)
-  const content = text.slice(startIdx, endIdx + TAG_FEEDBACK_END.length)
-
-  // Extract must fix items
-  const mustFixMatch = content.match(/####\s*必须修复[^]*?\n([-] [^\n]*(\n|$))*/)
-  const mustFix = mustFixMatch
-    ? mustFixMatch[1]
-        .split("\n")
-        .filter((l) => l.trim().startsWith("-"))
-        .map((l) => l.replace(/^-\s*/, "").trim())
-    : []
-
-  // Extract suggestions
-  const suggestMatch = content.match(/####\s*建议修复[^]*?\n([-] [^\n]*(\n|$))*/)
-  const suggestions = suggestMatch
-    ? suggestMatch[1]
-        .split("\n")
-        .filter((l) => l.trim().startsWith("-"))
-        .map((l) => l.replace(/^-\s*/, "").trim())
-    : []
-
-  // Extract innovation suggestions
-  const innovationMatch = content.match(/####\s*创新改进建议[^]*?\n([-] [^\n]*(\n|$))*/)
-  const innovations = innovationMatch
-    ? innovationMatch[1]
-        .split("\n")
-        .filter((l) => l.trim().startsWith("-"))
-        .map((l) => l.replace(/^-\s*/, "").trim())
-    : []
+  const content = text.slice(startIdx, endIdx + TAG_ADVISORY_END.length)
 
   // Extract score
   const scoreMatch = content.match(/\*\*总分\*\*\s*\|\s*\|\s*\*\*([\d.]+)/)
   const score = scoreMatch ? parseFloat(scoreMatch[1]) : 0
 
-  return {
-    decision,
-    iteration,
-    summary: content.slice(0, 500),
-    mustFix,
-    suggestions,
-    innovations,
-    score
-  }
+  return { content, score }
 }
 
 function hasSkipTag(text: string, skipTags: string[]): boolean {
@@ -346,49 +301,29 @@ export const SystemLoopPlugin: Plugin = async ({ directory, client }) => {
         const reviewContext = extractReviewRequest(textContent)
 
         if (reviewContext) {
-          // Review request detected - start or continue loop
-          let loopState = parseLoopState(directory)
-
-          if (!loopState) {
-            // Start new loop
-            loopState = {
-              active: true,
-              iteration: 1,
-              maxIterations: config.max_iterations,
-              triggeredBy: "auto",
-              startedAt: new Date().toISOString(),
-              context: reviewContext
-            }
-          } else {
-            // Update existing loop context
-            loopState.context = reviewContext
+          // Review request detected - trigger system engineer once
+          const loopState: LoopState = {
+            active: true,
+            iteration: 1,
+            maxIterations: 1,
+            triggeredBy: "auto",
+            startedAt: new Date().toISOString(),
+            context: reviewContext
           }
-
-          // Check max iterations
-          if (loopState.iteration > loopState.maxIterations) {
-            await client.app.log({
-              service: "system-loop",
-              level: "info",
-              message: `Max iterations (${loopState.maxIterations}) reached, completing`
-            })
-            deleteLoopState(directory)
-            return
-          }
-
           writeLoopState(directory, loopState)
 
-          // Trigger system engineer
-          await triggerSystemEngineer(sessionId, loopState, reviewContext, client)
+          // Trigger system engineer for advisory review
+          await triggerSystemEngineer(sessionId, reviewContext, client)
           return
         }
 
-        // No review request - check if we're in an active loop waiting for feedback
+        // No review request - check if we're waiting for advisory
         const loopState = parseLoopState(directory)
         if (loopState && loopState.active) {
-          // Check for system feedback
-          const feedback = parseSystemFeedback(textContent)
-          if (feedback) {
-            await handleFeedback(sessionId, feedback, loopState, directory, client, config)
+          // Check for system advisory
+          const advisory = parseSystemAdvisory(textContent)
+          if (advisory) {
+            await handleAdvisory(sessionId, advisory, directory, client)
           }
         }
 
@@ -409,7 +344,6 @@ export const SystemLoopPlugin: Plugin = async ({ directory, client }) => {
 
 async function triggerSystemEngineer(
   sessionId: string,
-  loopState: LoopState,
   context: string,
   client: SystemLoopClient
 ): Promise<void> {
@@ -417,15 +351,13 @@ async function triggerSystemEngineer(
 
 ## 系统评审请求
 
-**迭代:** ${loopState.iteration}/${loopState.maxIterations}
-
 ### 上下文
 ${context}
 
 ### 任务
 请对以上工作进行系统级别的深度分析，并输出结构化的评审报告。
 
-**注意：** 你必须使用 \`<system-feedback decision="continue|done" iteration="${loopState.iteration}">\` 格式输出你的评审结果。`
+**注意：** 使用 \`<system-advisory>\` 格式输出建议报告。`
 
   await client.session.send({
     id: sessionId,
@@ -435,108 +367,34 @@ ${context}
   await client.app.log({
     service: "system-loop",
     level: "info",
-    message: `Triggered system-engineer for iteration ${loopState.iteration}`
+    message: "Triggered system-engineer for advisory review"
   })
 }
 
-async function handleFeedback(
+async function handleAdvisory(
   sessionId: string,
-  feedback: SystemFeedback,
-  loopState: LoopState,
+  advisory: SystemAdvisory,
   directory: string,
-  client: SystemLoopClient,
-  config: SystemLoopConfig
+  client: SystemLoopClient
 ): Promise<void> {
   await client.app.log({
     service: "system-loop",
     level: "info",
-    message: `Received feedback: decision=${feedback.decision}, score=${feedback.score}`
+    message: `Received advisory: score=${advisory.score}`
   })
 
-  if (feedback.decision === "done") {
-    // Loop complete - clean up and finish
-    deleteLoopState(directory)
+  // Clean up state - advisory is one-shot, no loop
+  deleteLoopState(directory)
 
-    const summaryMsg = `[系统评审通过]
+  const summaryMsg = `[系统评审建议已收到]
 
-**最终评分:** ${feedback.score}/5
-**迭代次数:** ${loopState.iteration}
+**评分:** ${advisory.score}/5
 
-评审完成，工作流程结束。
-
-${feedback.innovations.length > 0 ? `**创新建议（可后续考虑）:**\n${feedback.innovations.map((i) => `- ${i}`).join("\n")}` : ""}`
-
-    await client.session.send({
-      id: sessionId,
-      text: summaryMsg
-    })
-    return
-  }
-
-  // Continue iteration
-  const nextIteration = loopState.iteration + 1
-
-  if (nextIteration > loopState.maxIterations) {
-    // Max iterations reached
-    deleteLoopState(directory)
-
-    const maxIterMsg = `[系统评审 - 达到最大迭代次数]
-
-**评分:** ${feedback.score}/5
-**最大迭代:** ${loopState.maxIterations}
-
-虽然还有改进空间，但已达到最大迭代次数，工作流程结束。
-
-**待改进项:**
-${feedback.mustFix.length > 0 ? feedback.mustFix.map((f) => `- [必须] ${f}`).join("\n") : ""}
-${feedback.suggestions.map((s) => `- [建议] ${s}`).join("\n")}
-
-**创新建议（可后续考虑）:**
-${feedback.innovations.map((i) => `- ${i}`).join("\n")}`
-
-    await client.session.send({
-      id: sessionId,
-      text: maxIterMsg
-    })
-    return
-  }
-
-  // Continue with next iteration
-  const updatedState: LoopState = {
-    ...loopState,
-    iteration: nextIteration
-  }
-  writeLoopState(directory, updatedState)
-
-  const continuationPrompt = `[系统评审 - 需要改进]
-
-**评分:** ${feedback.score}/5
-**迭代:** ${loopState.iteration} → ${nextIteration}/${loopState.maxIterations}
-
----
-
-**必须修复的问题:**
-${feedback.mustFix.length > 0 ? feedback.mustFix.map((f) => `- ${f}`).join("\n") : "无"}
-
-**建议改进:**
-${feedback.suggestions.length > 0 ? feedback.suggestions.map((s) => `- ${s}`).join("\n") : "无"}
-
-**创新建议:**
-${feedback.innovations.length > 0 ? feedback.innovations.map((i) => `- ${i}`).join("\n") : "无"}
-
----
-
-请根据以上反馈进行改进，完成后再次输出 \`<system-review-request>\` 标签请求系统评审。`
+以上为 @system-engineer 的建议报告，供参考。如需根据建议进行改进，请自行决定。`
 
   await client.session.send({
     id: sessionId,
-    text: continuationPrompt
-  })
-
-  await client.app.log({
-    service: "system-loop",
-    level: "info",
-    message: `Continuing to iteration ${nextIteration}`
+    text: summaryMsg
   })
 }
 
