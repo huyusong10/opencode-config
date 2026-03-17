@@ -228,7 +228,7 @@
     // - 测试执行结果
     // - Git 提交记录
     //
-    // 日志位置: .planning/.logs/
+    // 日志位置: .log/
     // - daily/*.jsonl  - 按日期汇总
     // - sessions/*/    - 按会话分类
     // - tasks/         - 按任务分类

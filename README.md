@@ -355,7 +355,7 @@ NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST
 ### 日志目录
 
 ```
-.planning/.logs/
+.log/
 ├── sessions/[session-id]/*.jsonl  # 按会话
 ├── daily/YYYY-MM-DD.jsonl         # 按日期
 └── tasks/[phase-plan].jsonl       # 按任务
@@ -413,13 +413,13 @@ opencode-config/
 │   ├── planning-mode.md     # 规划模式
 │   ├── execution-mode.md    # 执行模式
 │   └── system-engineer-trigger.md  # 系统工程师触发规则
+├── .log/                  # 任务日志目录（运行时生成，task-logger 插件写入）
 └── .planning/             # 项目规划目录（运行时生成）
     ├── PROJECT.md
     ├── REQUIREMENTS.md
     ├── ROADMAP.md
     ├── STATE.md
-    ├── phases/
-    └── .logs/
+    └── phases/
 ```
 
 ---
