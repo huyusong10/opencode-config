@@ -1,16 +1,15 @@
 import type { Plugin, PluginInput } from "@opencode-ai/plugin"
-import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync } from "fs"
-import { basename, dirname, extname, join } from "path"
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from "fs"
+import { join } from "path"
 
 type LogType =
   | "session_start"
   | "session_end"
   | "task_start"
   | "task_complete"
+  | "subagent_spawn"
   | "test_run"
   | "commit"
-  | "hook_block"
-  | "hook_pass"
   | "error"
 
 interface TaskCompleteData {
@@ -18,6 +17,16 @@ interface TaskCompleteData {
   lines_deleted: number
   commits: GitCommitInfo[]
   status: "pass" | "fail"
+}
+
+interface SubagentSpawnData {
+  subagent: string       // e.g. "coder", "tester", "debugger"
+  description: string   // truncated task description (≤120 chars)
+}
+
+interface SessionEndData {
+  tool_budget: Record<string, number>  // { bash: 42, read: 18, ... }
+  errors_suppressed: number            // errors throttled during session
 }
 
 interface TestRunData {
@@ -32,9 +41,17 @@ interface CommitData {
 
 interface ErrorData {
   error: string
+  count: number  // how many times this signature occurred (1 = first time)
 }
 
-type LogData = Record<string, never> | TaskCompleteData | TestRunData | CommitData | ErrorData
+type LogData =
+  | Record<string, unknown>
+  | TaskCompleteData
+  | SubagentSpawnData
+  | SessionEndData
+  | TestRunData
+  | CommitData
+  | ErrorData
 
 interface LogEntry {
   ts: string
@@ -60,22 +77,41 @@ interface GitDiffStats {
   lines_deleted: number
 }
 
-// Session-scoped states to track transitions
-const MAX_SESSIONS = 100 // Prevent unbounded memory growth
-const sessionStates = new Map<string, {
-  activeTask: string;
-  activePhase: string;
-  activePlan: string;
-}>()
+// Error throttle: max logged occurrences per unique error signature per session
+const ERROR_LOG_LIMIT = 3
 
-function getSessionState(sessionId: string) {
+interface SessionState {
+  activeTask: string
+  activePhase: string
+  activePlan: string
+  taskHadError: boolean
+  // tool_budget: counts every tool call for the session-end summary
+  toolBudget: Record<string, number>
+  // error throttle: signature -> times logged
+  errorCounts: Map<string, number>
+  // total errors suppressed (for session_end reporting)
+  errorsSuppressed: number
+}
+
+const MAX_SESSIONS = 100
+const sessionStates = new Map<string, SessionState>()
+
+function getSessionState(sessionId: string): SessionState {
   if (sessionStates.size >= MAX_SESSIONS) {
     const oldestKey = sessionStates.keys().next().value
     if (oldestKey) sessionStates.delete(oldestKey)
   }
   let state = sessionStates.get(sessionId)
   if (!state) {
-    state = { activeTask: "", activePhase: "", activePlan: "" }
+    state = {
+      activeTask: "",
+      activePhase: "",
+      activePlan: "",
+      taskHadError: false,
+      toolBudget: {},
+      errorCounts: new Map(),
+      errorsSuppressed: 0,
+    }
     sessionStates.set(sessionId, state)
   }
   return state
@@ -85,31 +121,37 @@ function cleanupSessionState(sessionId: string) {
   sessionStates.delete(sessionId)
 }
 
-async function getGitDiffStats(ctx: PluginInput, sinceCommit?: string): Promise<GitDiffStats> {
+// Returns true if this error should be logged; false if throttled
+function shouldLogError(state: SessionState, errorMsg: string): boolean {
+  // Signature = first non-empty line, capped at 80 chars
+  const sig = errorMsg.split("\n").find(l => l.trim()) ?? errorMsg
+  const key = sig.slice(0, 80)
+  const count = (state.errorCounts.get(key) ?? 0) + 1
+  state.errorCounts.set(key, count)
+  if (count > ERROR_LOG_LIMIT) {
+    state.errorsSuppressed++
+    return false
+  }
+  return true
+}
+
+async function getGitDiffStats(ctx: PluginInput): Promise<GitDiffStats> {
   try {
-    const baseRef = sinceCommit || "HEAD~1"
-    const result = await ctx.$`git diff --stat ${baseRef}`
+    const result = await ctx.$`git diff --numstat HEAD~1`
     const output = result.stdout.trim()
+    if (!output) return { files_changed: [], lines_added: 0, lines_deleted: 0 }
 
-    if (!output) {
-      return { files_changed: [], lines_added: 0, lines_deleted: 0 }
-    }
-
-    const lines = output.split("\n")
     const filesChanged: string[] = []
     let linesAdded = 0
     let linesDeleted = 0
-
-    for (const line of lines) {
-      const fileMatch = line.match(/^\s*(.+?)\s*\|\s*(\d+)\s*([+-]+)/)
-      if (fileMatch) {
-        filesChanged.push(fileMatch[1].trim())
-        const changeStr = fileMatch[3] || ""
-        linesAdded += (changeStr.match(/\+/g) || []).length
-        linesDeleted += (changeStr.match(/-/g) || []).length
+    for (const line of output.split("\n")) {
+      const parts = line.split("\t")
+      if (parts.length >= 3) {
+        linesAdded += parseInt(parts[0] || "0", 10) || 0
+        linesDeleted += parseInt(parts[1] || "0", 10) || 0
+        filesChanged.push(parts[2].trim())
       }
     }
-
     return { files_changed: filesChanged, lines_added: linesAdded, lines_deleted: linesDeleted }
   } catch (err) {
     console.error(`[task-logger] Failed to get git diff stats: ${err}`)
@@ -119,13 +161,11 @@ async function getGitDiffStats(ctx: PluginInput, sinceCommit?: string): Promise<
 
 async function getGitCommits(ctx: PluginInput, limit: number = 5): Promise<GitCommitInfo[]> {
   try {
-    const result = await ctx.$`git log --pretty=format:"%H|_%s|_%an|_%aI" -n ${limit}`
+    const result = await ctx.$`git log --pretty=format:"%H%x00%s%x00%an%x00%aI" -n ${limit}`
     const output = result.stdout.trim()
-
     if (!output) return []
-
     return output.split("\n").map(line => {
-      const parts = line.split("|_")
+      const parts = line.split("\x00")
       return {
         hash: parts[0] || "",
         message: parts[1] || "",
@@ -139,188 +179,230 @@ async function getGitCommits(ctx: PluginInput, limit: number = 5): Promise<GitCo
   }
 }
 
-function parseStateFile(ctx: PluginInput) {
-  const statePath = join(ctx.directory, ".planning", "STATE.md")
-  if (!existsSync(statePath)) return null
-
+function parseStateFile(filePath: string) {
+  if (!existsSync(filePath)) return null
   try {
-    const content = readFileSync(statePath, "utf-8")
+    const content = readFileSync(filePath, "utf-8")
     let phase = ""
     let plan = ""
     let task = ""
-
-    const lines = content.split("\n")
-    for (const line of lines) {
+    for (const line of content.split("\n")) {
       const trimmed = line.trim()
-      if (trimmed.startsWith("阶段:") || trimmed.includes("current_phase:")) {
-        phase = trimmed.split(":").pop()?.trim() || phase
-      }
-      if (trimmed.startsWith("计划:") || trimmed.includes("current_plan:")) {
-        plan = trimmed.split(":").pop()?.trim() || plan
-      }
-      if (trimmed.startsWith("任务:") || trimmed.includes("current_task:")) {
-        task = trimmed.split(":").pop()?.trim() || task
-      }
+      const colonIdx = trimmed.indexOf(":")
+      if (colonIdx === -1) continue
+      const key = trimmed.slice(0, colonIdx).trim()
+      const value = trimmed.slice(colonIdx + 1).trim()
+      if (key === "阶段" || key === "current_phase") phase = value || phase
+      if (key === "计划" || key === "current_plan") plan = value || plan
+      if (key === "任务" || key === "current_task") task = value || task
     }
-
     return { phase, plan, task }
   } catch (err) {
-    console.error(`[task-logger] Failed to parse STATE.md: ${err}`)
+    console.error(`[task-logger] Failed to parse state file: ${err}`)
     return null
   }
 }
 
-function writeLog(ctx: PluginInput, entry: LogEntry) {
-  const planningDir = join(ctx.directory, ".planning")
-  const logsDir = join(planningDir, ".logs")
-  const dailyDir = join(logsDir, "daily")
-  const sessionDir = join(logsDir, "sessions", entry.session)
-  const taskDir = join(logsDir, "tasks")
+// Extract subagent name from a task tool command string.
+// The task tool is typically called with text like "@coder\n\n## Task\n..."
+function extractSubagent(command: string): string {
+  const match = command.match(/@(\w+)/)
+  return match ? match[1].toLowerCase() : "unknown"
+}
 
-  if (!existsSync(dailyDir)) mkdirSync(dailyDir, { recursive: true })
-  if (!existsSync(sessionDir)) mkdirSync(sessionDir, { recursive: true })
-  if (!existsSync(taskDir)) mkdirSync(taskDir, { recursive: true })
-
-  const dateStr = new Date().toISOString().split("T")[0]
-  const line = JSON.stringify(entry) + "\n"
-
-  // Use session-scoped daily log files to avoid concurrent write conflicts
-  const sessionPrefix = entry.session.slice(0, 8)
-  const targets: [string, string][] = [
-    ["daily", join(dailyDir, `${dateStr}-${sessionPrefix}.jsonl`)],
-    ["session", join(sessionDir, `${entry.agent || "maker"}.jsonl`)],
-  ]
-  if (entry.phase && entry.plan) {
-    targets.push(["task", join(taskDir, `${entry.phase}-${entry.plan}.jsonl`)])
-  }
-
-  for (const [label, path] of targets) {
-    try {
-      appendFileSync(path, line)
-    } catch (err) {
-      console.error(`[task-logger] Failed to write ${label} log to ${path}: ${err}`)
-    }
-  }
+// Truncate a multi-line command to a single meaningful description line
+function extractDescription(command: string): string {
+  const lines = command.split("\n").map(l => l.trim()).filter(Boolean)
+  // Skip the @subagent line itself, take the next meaningful line
+  const descLine = lines.find(l => !l.startsWith("@") && !l.startsWith("#")) ?? lines[1] ?? ""
+  return descLine.slice(0, 120)
 }
 
 export const TaskLoggerPlugin: Plugin = async (ctx) => {
+  const logsDir = join(ctx.directory, ".log")
+  mkdirSync(join(logsDir, "daily"), { recursive: true })
+  mkdirSync(join(logsDir, "tasks"), { recursive: true })
+
+  function writeLog(entry: LogEntry) {
+    const sessionDir = join(logsDir, "sessions", entry.session)
+    if (!existsSync(sessionDir)) mkdirSync(sessionDir, { recursive: true })
+
+    const dateStr = new Date().toISOString().split("T")[0]
+    const line = JSON.stringify(entry) + "\n"
+    const sessionPrefix = entry.session.slice(0, 8)
+
+    const targets: [string, string][] = [
+      ["daily", join(logsDir, "daily", `${dateStr}-${sessionPrefix}.jsonl`)],
+      ["session", join(sessionDir, `${entry.agent || "default"}.jsonl`)],
+    ]
+    if (entry.phase && entry.plan) {
+      targets.push(["task", join(logsDir, "tasks", `${entry.phase}-${entry.plan}.jsonl`)])
+    }
+
+    for (const [label, path] of targets) {
+      try {
+        appendFileSync(path, line)
+      } catch (err) {
+        console.error(`[task-logger] Failed to write ${label} log to ${path}: ${err}`)
+      }
+    }
+  }
+
+  async function flushActiveTask(sid: string, state: SessionState) {
+    if (!state.activeTask) return
+    const gitStats = await getGitDiffStats(ctx)
+    const commits = await getGitCommits(ctx, 3)
+    writeLog({
+      ts: new Date().toISOString(),
+      type: "task_complete",
+      session: sid,
+      phase: state.activePhase,
+      plan: state.activePlan,
+      task: state.activeTask,
+      data: {
+        lines_added: gitStats.lines_added,
+        lines_deleted: gitStats.lines_deleted,
+        commits,
+        status: state.taskHadError ? "fail" : "pass",
+      }
+    })
+  }
+
   return {
     event: async ({ event }) => {
       if (event.type === "session.created") {
         const props = event.properties as any
         const sid = props?.info?.id || "unknown"
-        writeLog(ctx, {
-          ts: new Date().toISOString(),
-          type: "session_start",
-          session: sid,
-          data: {}
-        })
+        writeLog({ ts: new Date().toISOString(), type: "session_start", session: sid, data: {} })
+
       } else if (event.type === "session.deleted") {
         const props = event.properties as any
         const sid = props?.info?.id || "unknown"
-        cleanupSessionState(sid)
-        writeLog(ctx, {
+        const state = getSessionState(sid)
+
+        await flushActiveTask(sid, state)
+
+        // Write session_end with accumulated tool_budget summary
+        writeLog({
           ts: new Date().toISOString(),
           type: "session_end",
           session: sid,
-          data: {}
+          data: {
+            tool_budget: state.toolBudget,
+            errors_suppressed: state.errorsSuppressed,
+          } satisfies SessionEndData
         })
+
+        cleanupSessionState(sid)
       }
     },
 
     "tool.execute.after": async (input, output) => {
       const sid = input.sessionID || "unknown"
       const state = getSessionState(sid)
-      const tool = input.tool?.toLowerCase()
+      const tool = input.tool?.toLowerCase() ?? ""
 
-      // Auto-track state transitions by diffing STATE.md reads
+      // Always accumulate tool call counts for session_end summary
+      state.toolBudget[tool] = (state.toolBudget[tool] ?? 0) + 1
+
+      // Track task transitions via any STATE.md write
       if (tool === "write" || tool === "edit") {
         const args = output?.args as any
         const p = args?.filePath || args?.path || args?.file_path
         if (p && p.endsWith("STATE.md")) {
-          const parsedState = parseStateFile(ctx)
-          if (parsedState) {
-            const currentPhase = state.activePhase
-            const currentPlan = state.activePlan
-            const currentTask = state.activeTask
-
-            // If task changed or is new, complete old and start new
-            if (currentTask && currentTask !== parsedState.task) {
-              const gitStats = await getGitDiffStats(ctx)
-              const commits = await getGitCommits(ctx, 3)
-
-              writeLog(ctx, {
-                ts: new Date().toISOString(),
-                type: "task_complete",
-                session: sid,
-                agent: "maker",
-                phase: currentPhase,
-                plan: currentPlan,
-                task: currentTask,
-                data: {
-                  lines_added: gitStats.lines_added,
-                  lines_deleted: gitStats.lines_deleted,
-                  commits,
-                  status: "pass"
-                }
-              })
+          const absPath = p.startsWith("/") ? p : join(ctx.directory, p)
+          const parsed = parseStateFile(absPath)
+          if (parsed) {
+            if (state.activeTask && state.activeTask !== parsed.task) {
+              await flushActiveTask(sid, state)
             }
-
-            if (parsedState.task && currentTask !== parsedState.task) {
-              writeLog(ctx, {
+            if (parsed.task && state.activeTask !== parsed.task) {
+              state.taskHadError = false
+              writeLog({
                 ts: new Date().toISOString(),
                 type: "task_start",
                 session: sid,
-                agent: "maker",
-                phase: parsedState.phase,
-                plan: parsedState.plan,
-                task: parsedState.task,
+                phase: parsed.phase,
+                plan: parsed.plan,
+                task: parsed.task,
                 data: {}
               })
             }
-
-            state.activePhase = parsedState.phase
-            state.activePlan = parsedState.plan
-            state.activeTask = parsedState.task
+            state.activePhase = parsed.phase
+            state.activePlan = parsed.plan
+            state.activeTask = parsed.task
           }
         }
       }
 
-      // Auto-track bash commands: tests and commits
+      // Track subagent spawns via the task tool
+      if (tool === "task") {
+        const args = output?.args as any
+        const command: string = args?.description || args?.content || args?.text || ""
+        if (command) {
+          writeLog({
+            ts: new Date().toISOString(),
+            type: "subagent_spawn",
+            session: sid,
+            phase: state.activePhase,
+            plan: state.activePlan,
+            task: state.activeTask,
+            data: {
+              subagent: extractSubagent(command),
+              description: extractDescription(command),
+            } satisfies SubagentSpawnData
+          })
+        }
+      }
+
+      // Track bash commands: git commits and test runs
+      let bashHandled = false
       if (tool === "bash") {
         const args = output?.args as any
-        const cmd = args?.command || ""
+        const cmd: string = args?.command || ""
+
         if (cmd.includes("git commit")) {
-          writeLog(ctx, {
+          writeLog({
             ts: new Date().toISOString(),
             type: "commit",
             session: sid,
             task: state.activeTask,
             data: { command: cmd, output: output?.output }
           })
+          bashHandled = true
         }
+
         if (cmd.includes("npm test") || cmd.includes("vitest") || cmd.includes("jest")) {
-          writeLog(ctx, {
+          writeLog({
             ts: new Date().toISOString(),
             type: "test_run",
             session: sid,
             task: state.activeTask,
             data: { command: cmd, success: !output.error }
           })
+          bashHandled = true
         }
       }
 
-      if (output?.error) {
-        writeLog(ctx, {
-          ts: new Date().toISOString(),
-          type: "error",
-          session: sid,
-          task: state.activeTask,
-          data: { error: String(output.error) }
-        })
+      // Log errors not already captured by a specific handler above.
+      // Throttle repeated identical errors to prevent log bloat.
+      if (output?.error && !bashHandled) {
+        const errorMsg = String(output.error)
+        if (shouldLogError(state, errorMsg)) {
+          const sig = errorMsg.split("\n").find(l => l.trim()) ?? errorMsg
+          const timesLogged = state.errorCounts.get(sig.slice(0, 80)) ?? 1
+          state.taskHadError = true
+          writeLog({
+            ts: new Date().toISOString(),
+            type: "error",
+            session: sid,
+            task: state.activeTask,
+            data: { error: errorMsg, count: timesLogged } satisfies ErrorData
+          })
+        }
       }
     }
   }
 }
 
-export default TaskLoggerPlugin;
+export default TaskLoggerPlugin

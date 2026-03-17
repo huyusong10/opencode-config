@@ -60,7 +60,7 @@ tools:
 
 ## 任务日志
 
-任务执行自动记录到 `.planning/.logs/`（daily/sessions/tasks），由 task-logger 插件管理，用于复盘分析和流程优化。
+任务执行自动记录到 `.log/`（daily/sessions/tasks），由 task-logger 插件管理，用于复盘分析和流程优化。
 
 ---
 
