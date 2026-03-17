@@ -59,16 +59,16 @@ tools:
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  1. Check .planning/ exists?                                    │
-│     ├── No → PLANNING MODE (创建规划结构)                       │
+│     ├── No → PLANNING MODE (create planning structure)          │
 │     └── Yes → Read STATE.md                                     │
 │                                                                 │
 │  2. Check STATE.md status                                       │
-│     ├── 不存在或非法值 → PLANNING MODE (修复或重建)             │
-│     ├── "planning" → PLANNING MODE (继续规划)                   │
-│     ├── "ready" → EXECUTION MODE (开始执行)                     │
-│     ├── "in_progress" → EXECUTION MODE (继续执行/恢复)          │
-│     ├── "completed" → 检查下一阶段 → 有则 ready，无则报告完成   │
-│     └── "blocked" → 报告阻塞项，等待用户处理                    │
+│     ├── missing/invalid → PLANNING MODE (fix or rebuild)        │
+│     ├── "planning" → PLANNING MODE (continue planning)          │
+│     ├── "ready" → EXECUTION MODE (start execution)              │
+│     ├── "in_progress" → EXECUTION MODE (continue/resume)        │
+│     ├── "completed" → check next phase → ready or report done   │
+│     └── "blocked" → report blockers, wait for user              │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```

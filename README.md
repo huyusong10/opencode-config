@@ -41,10 +41,10 @@ cd ~/opencode-config && git pull
 ### 杠铃架构总览
 
 ```
-         规划（宽）               执行（细）              审查（宽）
+     Planning (wide)         Execution (narrow)          Review (wide)
 ┌────────────────────┐   ┌──────────────────────┐   ┌────────────────────┐
 │    Design Team     │   │       Maestro         │   │   Reviewer Team    │
-│                    │   │  状态驱动，自动切换   │   │                    │
+│                    │   │  Auto-mode switching │   │                    │
 │ arch-designer      │──▶│  Planning Mode        │──▶│ arch-reviewer      │
 │ ux-designer        │   │  Execution Mode       │   │ security-reviewer  │
 │ risk-designer      │   │  Resume Mode          │   │ perf-reviewer      │
@@ -54,14 +54,14 @@ cd ~/opencode-config && git pull
 │  orchestrates 4↑   │   │  @debugger @reviewer  │   │ impact-reviewer    │
 │  in parallel)      │   │  @researcher          │   │ qa-reviewer        │
 │                    │   │  @committer           │   │ ────────────────── │
-│ 4 个专项并行       │   │                       │   │ 8 个专项并行       │
-│ 输出 <design-      │   │  Fast Path: ≤2 files  │   │ 强制触发，不可跳过 │
-│ synthesis>         │   │  直接执行             │   │ 输出 <system-      │
-│ 供Goal-Backward用  │   │                       │   │ advisory>          │
+│ 4 specialists      │   │                       │   │ 8 specialists      │
+│ Output <design-    │   │  Fast Path: ≤2 files  │   │ Required, no skip  │
+│ synthesis>         │   │  Direct execute       │   │ Output <system-    │
+│ for Goal-Backward  │   │                       │   │ advisory>          │
 └────────────────────┘   └──────────────────────┘   └────────────────────┘
          │                          │                          │
-    Goal-Backward              Wave 执行                  质量门禁
-    目标反推方法论             波次并行/串行              加权评分 X.X/5
+    Goal-Backward              Wave Dispatch              Quality Gate
+    Goal-Backward method       Wave parallel/serial       Weighted X.X/5
 ```
 
 ---
@@ -182,7 +182,7 @@ Architect 负责理解需求、设计解决方案并创建可执行的开发计�
 │  │ - Level 3: Full research cycle (architecture decisions)             │    │
 │  └─────────────────────────────────────────────────────────────────────┘    │
 │                                     ↓                                       │
-│  Phase 2.5: Design Team（复杂任务，杠铃左端）                               │
+│  Phase 2.5: Design Team (complex tasks, barbell left end)                   │
 │  ┌─────────────────────────────────────────────────────────────────────┐    │
 │  │ - Emit <design-request> (goal + context + requirements + signals)  │    │
 │  │ - @system-designer dispatches 4 specialists in parallel:           │    │
@@ -280,30 +280,30 @@ Maker 负责执行 Architect 创建的计划，协调 subagent 并管理状态�
 │                       System Reviewer Workflow                              │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
-│  Primary Agent 完成规划/执行，输出 <system-review-request> tag（必须）      │
+│  Primary Agent: output <system-review-request> tag (required)               │
 │       |                                                                     │
 │       v                                                                     │
-│  system-loop plugin 检测到 tag，触发 @system-reviewer                       │
+│  system-loop plugin detects tag, triggers @system-reviewer                  │
 │       |                                                                     │
 │       v                                                                     │
-│  system-reviewer 分析上下文，自动路由：                                     │
+│  system-reviewer analyzes context, auto-routes:                             │
 │  +---------------------------------------------------------------------+    │
 │  | planning context  → arch + security + api + qa                      |    │
-│  | execution/arch_change → 全部 8 个专项（含 impact + qa）              |    │
+│  | execution/arch_change → all 8 specialists (incl. impact + qa)       |    │
 │  | execution/normal  → arch + security + test + maintain + impact + qa |    │
-│  | execution/small_change → maintain + test + impact + qa（轻量）      |    │
+│  | execution/small_change → maintain + test + impact + qa (light)      |    │
 │  +---------------------------------------------------------------------+    │
 │       |                                                                     │
 │       v                                                                     │
-│  并行派发：@task(subagent: xxx, parallel: true) × N                         │
-│  每个专项返回 <reviewer-report id="xxx">                                    │
+│  Parallel dispatch: @task(subagent: xxx, parallel: true) × N                │
+│  Each specialist returns <reviewer-report id="xxx">                         │
 │       |                                                                     │
 │       v                                                                     │
-│  system-reviewer 汇总：去重、强制 P0 覆盖、加权评分                          │
+│  system-reviewer aggregates: dedup, force P0, weighted score                │
 │       |                                                                     │
 │       v                                                                     │
-│  输出 <system-advisory>（含 **总分** X.X/5）                                │
-│  Primary Agent 收到建议，自行决定是否采纳                                   │
+│  Output <system-advisory> (includes **total score** X.X/5)                  │
+│  Primary Agent receives advice, decides whether to adopt                    │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
