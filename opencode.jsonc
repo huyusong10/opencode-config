@@ -291,8 +291,6 @@
     // 规划模式 - 需求探索、Goal-Backward、Wave 分组
     "rules/planning-mode.md",
     // 执行模式 - 模式调度、快速通道、归档流程
-    "rules/execution-mode.md",
-    // 系统工程师触发规则 - 触发条件、输出格式、跳过条件
-    "rules/system-engineer-trigger.md"
+    "rules/execution-mode.md"
   ]
 }
