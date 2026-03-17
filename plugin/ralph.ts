@@ -111,6 +111,8 @@ function checkCompletionPromise(text: string, promise: string): boolean {
   return promiseText === promise
 }
 
+const SYSTEM_LOOP_STATE_FILE = ".planning/system-loop.state.md"
+
 export const RalphPlugin: Plugin = async ({ directory, client, $ }) => {
   return {
     /**
@@ -123,6 +125,16 @@ export const RalphPlugin: Plugin = async ({ directory, client, $ }) => {
 
       const state = parseRalphState(directory)
       if (!state || !state.active) return
+
+      // system-loop has higher priority - yield to it when active
+      if (existsSync(join(directory, SYSTEM_LOOP_STATE_FILE))) {
+        await client.app.log({
+          service: "ralph-plugin",
+          level: "info",
+          message: "Yielding to system-loop (higher priority)",
+        })
+        return
+      }
 
       // Get the last assistant message to check for completion
       // We need to check if the completion promise was output
