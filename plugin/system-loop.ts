@@ -23,6 +23,30 @@ import { join } from "path"
 // Types
 // ============================================================================
 
+interface MessagePart {
+  type: string
+  text?: string
+}
+
+interface Message {
+  role: string
+  parts?: MessagePart[]
+}
+
+interface Session {
+  messages?: Message[]
+}
+
+interface SystemLoopClient {
+  session: {
+    get: (params: { id: string }) => Promise<Session>
+    send: (params: { id: string; text: string }) => Promise<void>
+  }
+  app: {
+    log: (params: { service: string; level: string; message: string }) => Promise<void>
+  }
+}
+
 interface SystemLoopConfig {
   enabled: boolean
   max_iterations: number
@@ -294,18 +318,18 @@ export const SystemLoopPlugin: Plugin = async ({ directory, client }) => {
 
       try {
         // Get the last assistant message
-        const session = await client.session.get({ id: sessionId })
+        const session: Session = await client.session.get({ id: sessionId })
         if (!session.messages || session.messages.length === 0) return
 
         const lastAssistantMsg = [...session.messages]
           .reverse()
-          .find((m: any) => m.role === "assistant")
+          .find((m: Message) => m.role === "assistant")
 
         if (!lastAssistantMsg) return
 
         const textContent = lastAssistantMsg.parts
-          ?.filter((p: any) => p.type === "text")
-          .map((p: any) => p.text)
+          ?.filter((p: MessagePart) => p.type === "text")
+          .map((p: MessagePart) => p.text || "")
           .join("\n") || ""
 
         // Check for skip tags
@@ -387,7 +411,7 @@ async function triggerSystemEngineer(
   sessionId: string,
   loopState: LoopState,
   context: string,
-  client: any
+  client: SystemLoopClient
 ): Promise<void> {
   const prompt = `@system-engineer
 
@@ -420,7 +444,7 @@ async function handleFeedback(
   feedback: SystemFeedback,
   loopState: LoopState,
   directory: string,
-  client: any,
+  client: SystemLoopClient,
   config: SystemLoopConfig
 ): Promise<void> {
   await client.app.log({

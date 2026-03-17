@@ -1,4 +1,4 @@
-import type { Plugin, Hooks, PluginInput } from "@opencode-ai/plugin"
+import type { Plugin, PluginInput } from "@opencode-ai/plugin"
 import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync } from "fs"
 import { basename, dirname, extname, join } from "path"
 
@@ -13,6 +13,29 @@ type LogType =
   | "hook_pass"
   | "error"
 
+interface TaskCompleteData {
+  lines_added: number
+  lines_deleted: number
+  commits: GitCommitInfo[]
+  status: "pass" | "fail"
+}
+
+interface TestRunData {
+  command: string
+  success: boolean
+}
+
+interface CommitData {
+  command: string
+  output?: string
+}
+
+interface ErrorData {
+  error: string
+}
+
+type LogData = Record<string, never> | TaskCompleteData | TestRunData | CommitData | ErrorData
+
 interface LogEntry {
   ts: string
   type: LogType
@@ -21,7 +44,7 @@ interface LogEntry {
   plan?: string
   task?: string
   agent?: string
-  data: any
+  data: LogData
 }
 
 interface GitCommitInfo {
@@ -37,10 +60,30 @@ interface GitDiffStats {
   lines_deleted: number
 }
 
-// Global states to track transitions
-const activeTask = new Map<string, string>();
-const activePhase = new Map<string, string>();
-const activePlan = new Map<string, string>();
+// Session-scoped states to track transitions
+const MAX_SESSIONS = 100 // Prevent unbounded memory growth
+const sessionStates = new Map<string, {
+  activeTask: string;
+  activePhase: string;
+  activePlan: string;
+}>()
+
+function getSessionState(sessionId: string) {
+  if (sessionStates.size >= MAX_SESSIONS) {
+    const oldestKey = sessionStates.keys().next().value
+    if (oldestKey) sessionStates.delete(oldestKey)
+  }
+  let state = sessionStates.get(sessionId)
+  if (!state) {
+    state = { activeTask: "", activePhase: "", activePlan: "" }
+    sessionStates.set(sessionId, state)
+  }
+  return state
+}
+
+function cleanupSessionState(sessionId: string) {
+  sessionStates.delete(sessionId)
+}
 
 async function getGitDiffStats(ctx: PluginInput, sinceCommit?: string): Promise<GitDiffStats> {
   try {
@@ -175,6 +218,7 @@ export const TaskLoggerPlugin: Plugin = async (ctx) => {
       } else if (event.type === "session.deleted") {
         const props = event.properties as any
         const sid = props?.info?.id || "unknown"
+        cleanupSessionState(sid)
         writeLog(ctx, {
           ts: new Date().toISOString(),
           type: "session_end",
@@ -186,21 +230,22 @@ export const TaskLoggerPlugin: Plugin = async (ctx) => {
 
     "tool.execute.after": async (input, output) => {
       const sid = input.sessionID || "unknown"
+      const state = getSessionState(sid)
       const tool = input.tool?.toLowerCase()
-      
+
       // Auto-track state transitions by diffing STATE.md reads
       if (tool === "write" || tool === "edit") {
         const args = output?.args as any
         const p = args?.filePath || args?.path || args?.file_path
         if (p && p.endsWith("STATE.md")) {
-          const state = parseStateFile(ctx)
-          if (state) {
-            const currentPhase = activePhase.get(sid)
-            const currentPlan = activePlan.get(sid)
-            const currentTask = activeTask.get(sid)
+          const parsedState = parseStateFile(ctx)
+          if (parsedState) {
+            const currentPhase = state.activePhase
+            const currentPlan = state.activePlan
+            const currentTask = state.activeTask
 
             // If task changed or is new, complete old and start new
-            if (currentTask && currentTask !== state.task) {
+            if (currentTask && currentTask !== parsedState.task) {
               const gitStats = await getGitDiffStats(ctx)
               const commits = await getGitCommits(ctx, 3)
 
@@ -221,22 +266,22 @@ export const TaskLoggerPlugin: Plugin = async (ctx) => {
               })
             }
 
-            if (state.task && currentTask !== state.task) {
+            if (parsedState.task && currentTask !== parsedState.task) {
               writeLog(ctx, {
                 ts: new Date().toISOString(),
                 type: "task_start",
                 session: sid,
                 agent: "maker",
-                phase: state.phase,
-                plan: state.plan,
-                task: state.task,
+                phase: parsedState.phase,
+                plan: parsedState.plan,
+                task: parsedState.task,
                 data: {}
               })
             }
 
-            activePhase.set(sid, state.phase)
-            activePlan.set(sid, state.plan)
-            activeTask.set(sid, state.task)
+            state.activePhase = parsedState.phase
+            state.activePlan = parsedState.plan
+            state.activeTask = parsedState.task
           }
         }
       }
@@ -250,7 +295,7 @@ export const TaskLoggerPlugin: Plugin = async (ctx) => {
             ts: new Date().toISOString(),
             type: "commit",
             session: sid,
-            task: activeTask.get(sid),
+            task: state.activeTask,
             data: { command: cmd, output: output?.output }
           })
         }
@@ -259,7 +304,7 @@ export const TaskLoggerPlugin: Plugin = async (ctx) => {
             ts: new Date().toISOString(),
             type: "test_run",
             session: sid,
-            task: activeTask.get(sid),
+            task: state.activeTask,
             data: { command: cmd, success: !output.error }
           })
         }
@@ -270,7 +315,7 @@ export const TaskLoggerPlugin: Plugin = async (ctx) => {
           ts: new Date().toISOString(),
           type: "error",
           session: sid,
-          task: activeTask.get(sid),
+          task: state.activeTask,
           data: { error: String(output.error) }
         })
       }

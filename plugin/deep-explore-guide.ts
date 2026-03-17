@@ -60,9 +60,14 @@ interface SessionState {
 // Session State Management
 // ============================================================================
 
+const MAX_SESSIONS = 100 // Prevent unbounded memory growth
 const sessions = new Map<string, SessionState>()
 
 function getSession(sessionId: string): SessionState {
+  if (sessions.size >= MAX_SESSIONS) {
+    const oldestKey = sessions.keys().next().value
+    if (oldestKey) sessions.delete(oldestKey)
+  }
   let state = sessions.get(sessionId)
   if (!state) {
     state = { failures: new Map(), injections: 0 }

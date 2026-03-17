@@ -258,7 +258,17 @@
     // - 退出条件: decision="done" 或达到最大迭代
     //
     // 配置文件: plugin/system-loop-config.yaml
-    "./plugin/system-loop.ts"
+    "./plugin/system-loop.ts",
+
+    // Ralph Loop 插件 - 持续迭代直到任务真正完成
+    //
+    // 核心机制: 拦截 session.idle 事件，检测 <promise> 标签
+    // - 未满足完成条件 → 重新注入 prompt，强制继续循环
+    // - 满足完成条件 → 停止循环
+    // - 超过最大迭代次数 → 停止循环（安全阀）
+    //
+    // 状态文件: .claude/ralph-loop.local.md
+    "./plugin/ralph.ts"
   ],
 
   // ============================================================================
