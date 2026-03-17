@@ -375,15 +375,15 @@ else
     echo "==> WARNING: Symlink mode is for debugging only. It may conflict with existing configs."
     if [ "$IS_GIT_REPO" = true ]; then
         echo "==> Creating symlinks..."
-        # Handle opencode.jsonc - merge if user has existing config, link if not
-        EXISTING_CFG=$(find_existing_config "$CONFIG_DIR")
-        if [ -n "$EXISTING_CFG" ] && [ -f "$REPO_DIR/opencode.jsonc" ]; then
-            echo "==> Merging opencode.jsonc..."
-            merge_opencode_config "$REPO_DIR/opencode.jsonc" "$CONFIG_DIR"
-        elif [ -f "$REPO_DIR/opencode.jsonc" ]; then
+        # Remove existing config files before linking
+        for cfg in opencode.jsonc opencode.json; do
+            [ -f "$CONFIG_DIR/$cfg" ] && rm -f "$CONFIG_DIR/$cfg"
+        done
+        # Create symlink for opencode.jsonc
+        if [ -f "$REPO_DIR/opencode.jsonc" ]; then
             ln -sf "$REPO_DIR/opencode.jsonc" "$CONFIG_DIR/opencode.jsonc"
         fi
-        # Link other files
+        # Link other files (ln -sf handles existing files/symlinks)
         for item in $INSTALL_ITEMS; do
             [ -e "$REPO_DIR/$item" ] && ln -sf "$REPO_DIR/$item" "$CONFIG_DIR/$item"
         done
@@ -404,15 +404,15 @@ else
                 exit 1
             fi
         fi
-        # Handle opencode.jsonc - merge if user has existing config, link if not
-        EXISTING_CFG=$(find_existing_config "$CONFIG_DIR")
-        if [ -n "$EXISTING_CFG" ] && [ -f "$REPO_DIR/opencode.jsonc" ]; then
-            echo "==> Merging opencode.jsonc..."
-            merge_opencode_config "$REPO_DIR/opencode.jsonc" "$CONFIG_DIR"
-        elif [ -f "$REPO_DIR/opencode.jsonc" ]; then
+        # Remove existing config files before linking
+        for cfg in opencode.jsonc opencode.json; do
+            [ -f "$CONFIG_DIR/$cfg" ] && rm -f "$CONFIG_DIR/$cfg"
+        done
+        # Create symlink for opencode.jsonc
+        if [ -f "$REPO_DIR/opencode.jsonc" ]; then
             ln -sf "$REPO_DIR/opencode.jsonc" "$CONFIG_DIR/opencode.jsonc"
         fi
-        # Link other files
+        # Link other files (ln -sf handles existing files/symlinks)
         for item in $INSTALL_ITEMS; do
             [ -e "$REPO_DIR/$item" ] && ln -sf "$REPO_DIR/$item" "$CONFIG_DIR/$item"
         done
