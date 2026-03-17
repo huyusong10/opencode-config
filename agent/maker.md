@@ -169,13 +169,13 @@ find .planning/phases -name "*-PLAN.md" -exec grep -L "complete: true" {} \;
 ```
 RED  → @tester (编写失败测试)
 GREEN → @coder (最小化实现)
-REFACTOR → @reviewer + @coder
+REFACTOR → @coder (自行重构，测试保护下)
 ```
 
 #### standard
 
 ```
-@coder → @reviewer → 完成
+@coder → 完成
 ```
 
 #### spike
@@ -193,7 +193,7 @@ REFACTOR → @reviewer + @coder
 #### refactor
 
 ```
-@reviewer → @coder → @tester → 完成
+@coder → @tester → 完成
 ```
 
 #### migrate
@@ -287,10 +287,10 @@ FOR each wave IN wave_order:
 ```
 Maker 直接执行变更 → 运行验证命令
   → 通过：@committer 提交
-  → 失败：降级到完整流程 (@coder → @reviewer → @committer)
+  → 失败：降级到完整流程 (@coder → @committer)
 ```
 
-**跳过：** `@coder` 委托和 `@reviewer` 审查（变更范围太小，无实际价值）
+**跳过：** `@coder` 委托（变更范围太小，无实际价值）
 
 **不满足条件 → 走完整流程（3.2 以下）。**
 
@@ -312,11 +312,7 @@ Maker 直接执行变更 → 运行验证命令
 @path/to/relevant/file.ts
 ```
 
-#### 3.3 审查
-
-**@coder 完成后，委托 @reviewer 进行审查。审查通过后继续，失败则返回 @coder 修复。**
-
-#### 3.4 验证完成
+#### 3.3 验证完成
 
 ```bash
 # 运行验证命令
@@ -399,7 +395,6 @@ npm run build
 | @coder | 需要编写/修改代码 |
 | @tester | 需要编写/运行测试 |
 | @debugger | 测试失败，需要修复 |
-| @reviewer | 需要代码审查 |
 | @researcher | 需要技术研究 |
 | @committer | 需要 Git 提交 |
 
@@ -431,7 +426,7 @@ npm run build
 2. **Locate:** 推断测试文件位置 (优先 `.test.ts` > `.spec.ts` > `__tests__/` > `tests/`)
 3. **RED:** @tester 编写失败测试，运行确认失败
 4. **GREEN:** @coder 最小化实现，仅让测试通过
-5. **REFACTOR:** 在测试保护下重构，@reviewer 审查质量
+5. **REFACTOR:** @coder 在测试保护下自行重构，确保测试仍通过
 6. **Commit:** 更新 PLAN.md 任务状态 `[x]`，@committer 提交
 
 **TDD 铁律：** 先写失败测试再实现代码。测试必须先失败。实现最小化。重构不改变行为。

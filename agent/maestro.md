@@ -149,11 +149,11 @@ tools:
 | Mode | Flow |
 |------|------|
 | ralph | @coder → @tester → (pass? done : @debugger → loop) |
-| tdd | RED → GREEN → REFACTOR |
-| standard | @coder → @reviewer → done |
+| tdd | RED(@tester) → GREEN(@coder) → REFACTOR(@coder) |
+| standard | @coder → done |
 | spike | @researcher → @coder → done |
 | debug | @debugger → @tester → done |
-| refactor | @reviewer → @coder → @tester → done |
+| refactor | @coder → @tester → done |
 | migrate | @coder → @tester → done |
 
 ### 铁律
@@ -190,7 +190,6 @@ tools:
 | @coder | 需要编写/修改代码 |
 | @tester | 需要编写/运行测试 |
 | @debugger | 测试失败，需要修复 |
-| @reviewer | 需要代码审查 |
 | @system-designer | 需要技术研究或多维设计分析（内部自动路由 @researcher） |
 | @committer | 需要 Git 提交 |
 

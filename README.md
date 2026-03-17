@@ -158,8 +158,8 @@ curl -fsSL https://raw.githubusercontent.com/huyusong10/opencode-config/main/ins
 │  Phase 2  Mode Dispatch                                                     │
 │  ┌───────────────────────────────────────────────────────────────────────┐  │
 │  │ ralph:    @coder → @tester → (fail? @debugger → loop)                 │  │
-│  │ tdd:      RED(@tester) → GREEN(@coder) → REFACTOR(@reviewer)          │  │
-│  │ standard: @coder → @reviewer → done                                   │  │
+│  │ tdd:      RED(@tester) → GREEN(@coder) → REFACTOR(@coder)             │  │
+│  │ standard: @coder → done                                               │  │
 │  │ debug:    @debugger → @tester → done                                  │  │
 │  └───────────────────────────────────────────────────────────────────────┘  │
 │                                       ↓                                     │
@@ -191,22 +191,21 @@ opencode-config/
 │   ├── maestro.md              # Maestro — full pipeline (recommended)
 │   ├── architect.md            # Architect — planning only
 │   ├── maker.md                # Maker — execution only
-│   ├── subagent/               # Execution subagents
-│   │   ├── fluid-worker.md     # Zero-persona executor for Fluid
-│   │   ├── coder.md
-│   │   ├── tester.md
-│   │   ├── debugger.md
-│   │   ├── reviewer.md
-│   │   ├── researcher.md
-│   │   └── committer.md
-│   ├── designer/               # Planning left end (4 specialists + orchestrator)
-│   │   ├── system-designer.md
+│   ├── designer/               # Planning left end — design & research
+│   │   ├── system-designer.md  # Orchestrator: spawns 4 designers + researcher
 │   │   ├── arch-designer.md
 │   │   ├── ux-designer.md
 │   │   ├── risk-designer.md
-│   │   └── impl-designer.md
-│   └── reviewer/               # Review right end (8 specialists + orchestrator)
-│       ├── system-reviewer.md
+│   │   ├── impl-designer.md
+│   │   └── researcher.md       # Technology research (routed via system-designer)
+│   ├── executor/               # Middle execution — implement, test, debug, commit
+│   │   ├── coder.md
+│   │   ├── tester.md
+│   │   ├── debugger.md
+│   │   ├── committer.md
+│   │   └── fluid-worker.md     # Zero-persona executor for Fluid
+│   └── reviewer/               # Review right end — delivery gate
+│       ├── system-reviewer.md  # Orchestrator: routes to specialists
 │       ├── arch-reviewer.md
 │       ├── security-reviewer.md
 │       ├── perf-reviewer.md
