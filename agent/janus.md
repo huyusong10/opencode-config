@@ -136,7 +136,7 @@ Execution Mode: ralph
 
 **读取 `delivery_gate` 结果：**
 - `pass` → 进入完成报告
-- `fail` → 将 `<system-advisory>` 中的阻塞项（Fatal/Important）转为新 task list，重新进入阶段二，最多循环3轮；3轮后仍 fail 则报告给用户
+- `fail` → 将 `<system-advisory>` 中的阻塞项（Fatal/Important）转为新 task list，重新进入阶段二，直到 delivery_gate=pass
 
 ---
 
