@@ -213,18 +213,16 @@ tools:
 
 ---
 
-## 系统工程师触发
+## 系统评审触发
 
-**在归档完成后，可选择输出系统评审请求标签，触发 @system-reviewer 组建评审团队进行系统级深度分析。@system-reviewer 的输出为建议性报告，你自行决定是否采纳。**
+**在归档完成后，必须输出系统评审请求标签，触发 @system-reviewer 进行系统级分析。系统评审不可跳过，包括快速通道任务。@system-reviewer 的输出为建议性报告，你自行决定是否采纳。**
 
-**适合触发的场景：**
-- 涉及架构变更或新模块
-- 跨服务逻辑、复杂业务流程
-- 对当前方案有疑虑时
+**路由说明（system-reviewer 自动判断）：**
+- 快速通道任务 / 小范围修改（变更文件 < 3 个，无新文件）→ 自动路由到轻量级 `small_change` 评审（maintain + test + impact + qa）
+- 正常任务 → `normal` 评审（arch + security + test + maintain + impact + qa）
+- 架构变更 / 新增模块 → `arch_change` 全量评审（所有 reviewer）
 
-**可跳过的场景：**
-- 快速通道任务（小范围修改）
-- 纯文档更新、配置微调、typo 修复
+**无论变更大小，均必须触发——即使是小改动也可能对现有功能造成意外影响。**
 
 ```markdown
 <system-review-request>

@@ -58,14 +58,20 @@ normal：以上都不满足的默认值
 
 ### 第二步：派发并行审查任务
 
+**系统评审是必须的，无论变更大小，始终触发。小改动（small_change）使用轻量路由，不可跳过。**
+
+**qa-reviewer 和 impact-reviewer 是特殊角色：**
+- `qa-reviewer`：强制，所有 4 种路由均派发（过程合规审查）
+- `impact-reviewer`：所有 execution 路由派发，planning 路由不派发（无代码变更，无需影响分析）
+
 根据路由矩阵，启动对应的专项 agent：
 
 | 上下文 | 范围 | 派发的专项 agent |
 |--------|------|----------------|
-| planning | - | arch-reviewer, security-reviewer, api-reviewer |
-| execution | arch_change | arch-reviewer, security-reviewer, perf-reviewer, test-reviewer, maintain-reviewer, api-reviewer |
-| execution | normal | arch-reviewer, security-reviewer, test-reviewer, maintain-reviewer |
-| execution | small_change | maintain-reviewer, test-reviewer |
+| planning | - | arch-reviewer, security-reviewer, api-reviewer, **qa-reviewer（强制）** |
+| execution | arch_change | arch-reviewer, security-reviewer, perf-reviewer, test-reviewer, maintain-reviewer, api-reviewer, **impact-reviewer（强制）**, **qa-reviewer（强制）** |
+| execution | normal | arch-reviewer, security-reviewer, test-reviewer, maintain-reviewer, **impact-reviewer（强制）**, **qa-reviewer（强制）** |
+| execution | small_change | maintain-reviewer, test-reviewer, **impact-reviewer（强制）**, **qa-reviewer（强制）** |
 
 **并行派发格式**（在你的响应中直接输出，所有 @task 调用同时启动）：
 
@@ -91,9 +97,33 @@ normal：以上都不满足的默认值
 ## Instructions
 
 请对以上变更进行安全维度的专项审查。返回 `<reviewer-report id="security">` 格式报告。
+
+---
+
+@task (subagent: impact-reviewer, parallel: true)
+
+## Review Context
+
+[粘贴完整的 <system-review-request> 内容]
+
+## Instructions
+
+请分析以上变更对现有功能、逻辑和描述的影响。返回 `<reviewer-report id="impact">` 格式报告。
+
+---
+
+@task (subagent: qa-reviewer, parallel: true)
+
+## Review Context
+
+[粘贴完整的 <system-review-request> 内容]
+
+## Instructions
+
+请对以上执行过程进行规则遵从度审查。返回 `<reviewer-report id="qa">` 格式报告。
 ```
 
-**重要**：将完整的 `<system-review-request>` 内容粘贴到每个 @task 中，不要省略。
+**重要**：将完整的 `<system-review-request>` 内容粘贴到每个 @task 中，不要省略。qa-reviewer 和 impact-reviewer 在所有路由下均必须派发。
 
 ### 第三步：收集并汇总结果
 
@@ -110,19 +140,27 @@ normal：以上都不满足的默认值
 无论原来分级如何：
 - security 发现含 `INJECTION` 或 `SENSITIVE_DATA` 标签 → **强制 P0**
 - api 发现含 `BREAKING_CHANGE` 标签 → **强制 P0**
+- qa 发现含 `DEVIATION_VIOLATION`、`CHECKPOINT_MISSING`、`VALIDATION_SKIPPED`、`REQUIREMENT_MISSED` 标签 → **强制 P0**
+- impact 发现含 `CALLER_BREAK` 标签 → **强制 P0**
 
 #### 加权评分计算
 
+qa-reviewer 和 impact-reviewer 在各自适用的路由中始终参与加权：
+
 | 上下文/范围 | 权重配置 |
 |-------------|---------|
-| planning | arch 35% + api 35% + security 30% |
-| execution/arch_change | arch 20% + security 20% + test 20% + perf 15% + maintain 15% + api 10% |
-| execution/normal | arch 25% + security 25% + test 25% + maintain 25% |
-| execution/small_change | test 50% + maintain 50% |
+| planning | arch 30% + api 25% + security 25% + qa 20% |
+| execution/arch_change | impact 18% + qa 20% + arch 12% + security 12% + test 12% + api 10% + maintain 8% + perf 8% |
+| execution/normal | impact 20% + qa 25% + arch 15% + security 15% + test 15% + maintain 10% |
+| execution/small_change | impact 25% + qa 35% + test 20% + maintain 20% |
 
 **处理失败的专项 agent**：从加权中排除，剩余权重按比例归一化，在报告头部注明。
 
-例：execution/normal 中 test-reviewer 失败 → 剩余3个权重归一化为 arch 33.3% + security 33.3% + maintain 33.3%
+**特殊规则**：
+- qa-reviewer 失败时：权重分摊给本次路由中权重最高的 2 个 reviewer（各加一半），并在报告头部明确警告（合规视角缺失）
+- impact-reviewer 失败时：权重分摊给 arch-reviewer（全量）或 test-reviewer（若无 arch），并注明影响分析缺失
+
+例：execution/normal 中 test-reviewer 失败 → 归一化：impact 23.5% + qa 29.4% + arch 17.6% + security 17.6% + maintain 11.8%
 
 ---
 
@@ -235,7 +273,7 @@ normal：以上都不满足的默认值
 
 ### 上下文极短或内容不足
 
-路由到 `execution/small_change`（最小路由），派发 maintain-reviewer + test-reviewer。两个 reviewer 会返回短报告（"无重大问题"），最终评分偏高（4-5/5），这是正确行为。
+路由到 `execution/small_change`（最小路由），派发 maintain-reviewer + test-reviewer + impact-reviewer + qa-reviewer（均强制）。reviewer 会返回短报告（"无重大问题"），最终评分偏高（4-5/5），这是正确行为。系统评审**不可跳过**，最轻的路由也是 small_change（4个 reviewer）。
 
 ---
 
