@@ -1,6 +1,6 @@
 import type { Plugin, PluginInput } from "@opencode-ai/plugin"
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "fs"
-import { join } from "path"
+import { join, dirname } from "path"
 
 type LogType =
   | "session_start"
@@ -241,6 +241,8 @@ export const TaskLoggerPlugin: Plugin = async (ctx) => {
 
     for (const [label, path] of targets) {
       try {
+        const dir = dirname(path)
+        if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
         appendFileSync(path, line)
       } catch (err) {
         console.error(`[task-logger] Failed to write ${label} log to ${path}: ${err}`)
