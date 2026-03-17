@@ -1,6 +1,6 @@
 # OpenCode 配置仓库
 
-个人 OpenCode AI 编程助手配置，聚焦于 **Maestro 统一 Agent 架构** 和状态驱动的工作流。
+个人 OpenCode AI 编程助手配置，基于 **杠铃架构**：规划（并行设计团队）→ 执行（状态驱动）→ 审查（并行评审团队），两端专项团队并行扩散，中间聚焦确定性执行。
 
 ## 安装
 
@@ -37,6 +37,34 @@ cd ~/opencode-config && git pull
 ---
 
 ## 核心架构
+
+### 杠铃架构总览
+
+```
+         规划（宽）               执行（细）              审查（宽）
+┌────────────────────┐   ┌──────────────────────┐   ┌────────────────────┐
+│    Design Team     │   │       Maestro         │   │   Reviewer Team    │
+│                    │   │  状态驱动，自动切换   │   │                    │
+│ arch-designer      │──▶│  Planning Mode        │──▶│ arch-reviewer      │
+│ ux-designer        │   │  Execution Mode       │   │ security-reviewer  │
+│ risk-designer      │   │  Resume Mode          │   │ perf-reviewer      │
+│ impl-designer      │   │                       │   │ test-reviewer      │
+│ ────────────────── │   │  Delegates:           │   │ maintain-reviewer  │
+│ (system-designer   │   │  @coder @tester       │   │ api-reviewer       │
+│  orchestrates 4↑   │   │  @debugger @reviewer  │   │ impact-reviewer    │
+│  in parallel)      │   │  @researcher          │   │ qa-reviewer        │
+│                    │   │  @committer           │   │ ────────────────── │
+│ 4 个专项并行       │   │                       │   │ 8 个专项并行       │
+│ 输出 <design-      │   │  Fast Path: ≤2 files  │   │ 强制触发，不可跳过 │
+│ synthesis>         │   │  直接执行             │   │ 输出 <system-      │
+│ 供Goal-Backward用  │   │                       │   │ advisory>          │
+└────────────────────┘   └──────────────────────┘   └────────────────────┘
+         │                          │                          │
+    Goal-Backward              Wave 执行                  质量门禁
+    目标反推方法论             波次并行/串行              加权评分 X.X/5
+```
+
+---
 
 ### Maestro Agent（推荐）
 
@@ -81,9 +109,24 @@ cd ~/opencode-config && git pull
 | @researcher | 研究技术、模式和解决方案 | 只读 |
 | @committer | 原子化 git 提交 | 只读 + bash |
 
+### 设计团队（Design Team）
+
+在规划阶段由 `@system-designer` 编排，并行进行多维度方案探索，输出供 Goal-Backward 使用的 `<design-synthesis>`：
+
+| Designer | 职责 |
+|----------|------|
+| system-designer | 编排者：并行派发 4 位专家、综合为 `<design-synthesis>` |
+| arch-designer | 架构结构与模块边界设计 |
+| ux-designer | 用户体验与 API 人机工程学设计 |
+| risk-designer | 风险、边界条件与约束设计 |
+| impl-designer | 技术可行性与实现路径设计 |
+
+**触发条件：** 有架构决策的复杂任务（由 Architect/Maestro 在 Phase 2.5 触发）
+**跳过条件：** 单文件 ≤ 20 行 / 配置文档 typo / 无架构决策空间
+
 ### 系统评审团队（System Reviewer Team）
 
-由 `@system-reviewer` 编排，在每次归档/规划完成后**强制触发**：
+作为杠铃架构的**右端**，在 Architect/Maker/Maestro 完成每次规划或执行归档后**强制触发**，不可跳过：
 
 | Reviewer | 职责 |
 |----------|------|
@@ -137,6 +180,15 @@ Architect 负责理解需求、设计解决方案并创建可执行的开发计�
 │  │ - Level 1: Use context7 for quick validation                        │    │
 │  │ - Level 2: Delegate to @researcher (choose between options)         │    │
 │  │ - Level 3: Full research cycle (architecture decisions)             │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│                                     ↓                                       │
+│  Phase 2.5: Design Team（复杂任务，杠铃左端）                               │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │ - Emit <design-request> (goal + context + requirements + signals)  │    │
+│  │ - @system-designer dispatches 4 specialists in parallel:           │    │
+│  │   arch-designer | ux-designer | risk-designer | impl-designer      │    │
+│  │ - Collect <design-synthesis> with Goal-Backward inputs             │    │
+│  │ Skip if: single-file ≤20 lines / config/docs/typo / no arch choice │    │
 │  └─────────────────────────────────────────────────────────────────────┘    │
 │                                     ↓                                       │
 │  Phase 3: Planning                                                          │
@@ -341,14 +393,20 @@ opencode-config/
 │   ├── maestro.md         # 统一 Agent（推荐）
 │   ├── architect.md       # 架构师 Agent（向后兼容）
 │   ├── maker.md           # 制造者 Agent（向后兼容）
-│   ├── subagent/          # 执行流功能型子代理
+│   ├── subagent/          # 执行流功能型子代理（杠铃中间）
 │   │   ├── coder.md
 │   │   ├── tester.md
 │   │   ├── debugger.md
 │   │   ├── reviewer.md    # 执行流规格合规审查
 │   │   ├── researcher.md
 │   │   └── committer.md
-│   └── reviewer/          # 系统评审团队（归档后触发）
+│   ├── designer/          # 设计团队：规划阶段并行扩散（杠铃左端）
+│   │   ├── system-designer.md   # 编排者
+│   │   ├── arch-designer.md     # 架构结构与模块边界
+│   │   ├── ux-designer.md       # 用户/开发者体验
+│   │   ├── risk-designer.md     # 风险与约束
+│   │   └── impl-designer.md     # 实现可行性
+│   └── reviewer/          # 评审团队：执行后并行评审（杠铃右端）
 │       ├── system-reviewer.md   # 编排者
 │       ├── arch-reviewer.md     # 架构与模块边界
 │       ├── security-reviewer.md # 安全漏洞（OWASP）
@@ -389,6 +447,18 @@ opencode-config/
 ---
 
 ## 设计理念
+
+### 杠铃架构原则
+
+```
+两头大（并行扩散），中间细（聚焦执行）
+```
+
+- **规划端（左）**：设计团队 4 专家并行探索，多视角发散，防止单一视角遗漏关键约束
+- **执行段（中）**：Maestro 聚焦确定性执行，状态驱动，最小化不确定性
+- **评审端（右）**：评审团队 8 专家并行检查，多维度收敛，确保质量门禁
+
+**价值**：扩散发生在最便宜的时机（规划期），收敛发生在最重要的位置（质量门禁），中间执行保持最小摩擦。
 
 ### 职责分离
 
