@@ -51,14 +51,14 @@ cd ~/opencode-config && git pull
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                           Maestro                                           │
 │                                                                             │
-│  State-Driven: 自动检测 STATE.md status 决定模式                            │
-│  - .planning/ 不存在 → Planning Mode (创建规划)                             │
-│  - status: ready → Execution Mode (执行计划)                                │
-│  - status: in_progress → Resume Mode (恢复中断)                             │
+│  State-Driven: auto-detect STATE.md status, determine mode                  │
+│  - .planning/ missing → Planning Mode (create plan)                         │
+│  - status: ready → Execution Mode (execute plan)                            │
+│  - status: in_progress → Resume Mode (resume interrupted)                   │
 │                                                                             │
-│  温度 0.35 平衡创造力与确定性:                                               │
-│  - Planning Mode: 创造性探索，广泛发散                                       │
-│  - Execution Mode: 确定性执行，严格验证                                     │
+│  Temperature 0.35 balances creativity and determinism:                      │
+│  - Planning Mode: creative exploration, broad divergence                    │
+│  - Execution Mode: deterministic execution, strict validation               │
 │                                                                             │
 │  Delegates: @coder, @tester, @debugger, @reviewer, @researcher, @committer  │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -324,7 +324,7 @@ Maker 负责执行 Architect 创建的计划，协调 subagent 并管理状态�
 ### 完成前验证
 
 ```
-声明之前先求证，始终如此。
+Always verify before claiming.
 
 BEFORE claiming any status:
 1. IDENTIFY: What command proves this claim?
