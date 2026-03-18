@@ -23,16 +23,16 @@ curl -fsSL https://raw.githubusercontent.com/huyusong10/opencode-config/main/ins
 │                                   │                                         │
 │                                   ▼                                         │
 │                         ┌───────────────┐                                   │
-│                         │    Fluid      │  ← 唯一入口                       │
-│                         │  (总工程师)    │                                   │
+│                         │    Fluid      │  <-- Single Entry Point           │
+│                         │ (Chief Eng.)  │                                   │
 │                         └───────┬───────┘                                   │
 │                                 │                                           │
 │              ┌──────────────────┼──────────────────┐                        │
 │              │                  │                  │                        │
 │              ▼                  ▼                  ▼                        │
 │     ┌─────────────┐    ┌─────────────┐    ┌─────────────┐                  │
-│     │fluid-worker │    │fluid-worker │    │fluid-worker │  ← 执行层        │
-│     │   (执行者)   │    │   (执行者)   │    │   (执行者)   │                  │
+│     │fluid-worker │    │fluid-worker │    │fluid-worker │  <-- Executors   │
+│     │  (Worker)   │    │  (Worker)   │    │  (Worker)   │                  │
 │     └─────────────┘    └─────────────┘    └─────────────┘                  │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -48,14 +48,13 @@ curl -fsSL https://raw.githubusercontent.com/huyusong10/opencode-config/main/ins
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                           Fluid Workflow                                     │
 ├───────────┬───────────┬───────────┬───────────┬─────────────────────────────┤
-│   评估    │   分类    │   规划    │   执行    │           交付              │
 │ Evaluate  │ Classify  │   Plan    │  Execute  │          Deliver            │
 ├───────────┼───────────┼───────────┼───────────┼─────────────────────────────┤
-│ 约束条件  │ 简单任务  │ 调研任务  │ 任务拆分  │ 门1: 审查                   │
-│ 核心意图  │ 评估任务  │ 设计任务  │ 分派协议  │ 门2: 反思                   │
-│ 隐含期望  │ 执行任务  │ 测试任务  │ 协调原则  │ 门3: 输出                   │
-│ 知识缺口  │ 复合任务  │ 迭代规划  │ 动态调整  │                             │
-│ 能力检查  │           │           │ 失败升级  │                             │
+│Constraint │  Simple   │ Research  │   Split   │  Gate 1: Review            │
+│  Intent   │ Evaluate  │  Design   │ Dispatch  │  Gate 2: Reflect           │
+│ Implicit  │ Execute   │   Test    │ Coordinate│  Gate 3: Output            │
+│   Gap     │ Compound  │ Iterate   │  Adjust   │                            │
+│ Capacity  │           │           │ Escalate  │                            │
 └───────────┴───────────┴───────────┴───────────┴─────────────────────────────┘
 ```
 
@@ -81,7 +80,7 @@ curl -fsSL https://raw.githubusercontent.com/huyusong10/opencode-config/main/ins
 ### 阶段 3：规划
 
 ```
-调研 → 设计 → 执行 → 测试
+Research -> Design -> Execute -> Test
 ```
 
 **调研原则：** 充分且有效。针对每个维度分派 subagent 深度调查。
@@ -115,9 +114,9 @@ curl -fsSL https://raw.githubusercontent.com/huyusong10/opencode-config/main/ins
 Fluid 总工指挥下的执行者，使用 OODA 循环执行任务：
 
 ```
-观察 (Observe) → 定向 (Orient) → 决策 (Decide) → 行动 (Act)
-       ↑                                                        │
-       └────────────────────────────────────────────────────────┘
+Observe -> Orient -> Decide -> Act
+    ^                         |
+    +-------------------------+
 ```
 
 **输出结构：**
