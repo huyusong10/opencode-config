@@ -14,7 +14,7 @@ curl -fsSL https://raw.githubusercontent.com/huyusong10/opencode-config/main/ins
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                              Architecture                                    │
+│                              Architecture                                   │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │                              ┌─────────┐                                    │
@@ -30,10 +30,10 @@ curl -fsSL https://raw.githubusercontent.com/huyusong10/opencode-config/main/ins
 │              ┌──────────────────┼──────────────────┐                        │
 │              │                  │                  │                        │
 │              ▼                  ▼                  ▼                        │
-│     ┌─────────────┐    ┌─────────────┐    ┌─────────────┐                  │
-│     │fluid-worker │    │fluid-worker │    │fluid-worker │  <-- Executors   │
-│     │  (Worker)   │    │  (Worker)   │    │  (Worker)   │                  │
-│     └─────────────┘    └─────────────┘    └─────────────┘                  │
+│     ┌─────────────┐    ┌─────────────┐    ┌─────────────┐                   │
+│     │fluid-worker │    │fluid-worker │    │fluid-worker │  <-- Executors    │
+│     │  (Worker)   │    │  (Worker)   │    │  (Worker)   │                   │
+│     └─────────────┘    └─────────────┘    └─────────────┘                   │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -46,15 +46,15 @@ curl -fsSL https://raw.githubusercontent.com/huyusong10/opencode-config/main/ins
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                           Fluid Workflow                                     │
+│                           Fluid Workflow                                    │
 ├───────────┬───────────┬───────────┬───────────┬─────────────────────────────┤
 │ Evaluate  │ Classify  │   Plan    │  Execute  │          Deliver            │
 ├───────────┼───────────┼───────────┼───────────┼─────────────────────────────┤
-│Constraint │  Simple   │ Research  │   Split   │  Gate 1: Review            │
-│  Intent   │ Evaluate  │  Design   │ Dispatch  │  Gate 2: Reflect           │
-│ Implicit  │ Execute   │   Test    │ Coordinate│  Gate 3: Output            │
-│   Gap     │ Compound  │ Iterate   │  Adjust   │                            │
-│ Capacity  │           │           │ Escalate  │                            │
+│Constraint │  Simple   │ Research  │   Split   │  Gate 1: Review             │
+│  Intent   │ Evaluate  │  Design   │ Dispatch  │  Gate 2: Reflect            │
+│ Implicit  │ Execute   │   Test    │ Coordinate│  Gate 3: Output             │
+│   Gap     │ Compound  │ Iterate   │  Adjust   │                             │
+│ Capacity  │           │           │ Escalate  │                             │
 └───────────┴───────────┴───────────┴───────────┴─────────────────────────────┘
 ```
 
@@ -177,6 +177,7 @@ opencode-config/
 | 多个审查代理 (system-reviewer + specialists) | Fluid 内部交付验证 |
 
 **原因：**
+
 - 简化用户交互模型
 - 减少上下文切换开销
 - 提高角色定位清晰度
