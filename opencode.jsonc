@@ -209,7 +209,8 @@
     // PTY 终端插件 - 提供真正的伪终端支持
     // 使交互式命令 (git commit、vim、top 等) 能正常工作
     // 支持长时间运行的进程 (dev server、watch 模式)
-    "opencode-pty@latest",
+    // 显著增加调用次数，慎用
+    // "opencode-pty@latest",
 
     // Git Worktree 插件 - 多分支并行开发支持
     // 自动管理 git worktree，支持在不同分支独立工作
@@ -232,7 +233,7 @@
     // - daily/*.jsonl  - 按日期汇总
     // - sessions/*/    - 按会话分类
     // - tasks/         - 按任务分类
-    "./plugin/task-logger.ts",
+    // "./plugin/task-logger.ts",
 
     // Deep Explore Guide 深度探索引导插件 - 失败时注入调查提示
     //
@@ -243,7 +244,7 @@
     // - 多次失败时增强提示，避免重复相同错误
     //
     // 配置文件: plugin/deep-explore-prompts.yaml
-    "./plugin/deep-explore-guide.ts",
+    // "./plugin/deep-explore-guide.ts",
 
     // System Loop 系统工程师迭代插件 - 流程末端的系统思考
     //
@@ -258,7 +259,7 @@
     // - 退出条件: decision="done" 或达到最大迭代
     //
     // 配置文件: plugin/system-loop-config.yaml
-    "./plugin/system-loop.ts",
+    // "./plugin/system-loop.ts",
 
     // Ralph Loop 插件 - 持续迭代直到任务真正完成
     //
