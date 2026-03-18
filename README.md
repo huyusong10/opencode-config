@@ -1,6 +1,6 @@
 # OpenCode 配置仓库
 
-AI 编程助手配置，提供统一的 Fluid 工作流：评估 → 分类 → 规划 → 执行 → 交付。
+AI 编程助手配置，提供统一的 Adapt 工作流：评估 → 分类 → 规划 → 执行 → 交付。
 
 ## 安装
 
@@ -23,7 +23,7 @@ curl -fsSL https://raw.githubusercontent.com/huyusong10/opencode-config/main/ins
 │                                   │                                         │
 │                                   ▼                                         │
 │                         ┌───────────────┐                                   │
-│                         │    Fluid      │  <-- Single Entry Point           │
+│                         │    Adapt      │  <-- Single Entry Point           │
 │                         │ (Chief Eng.)  │                                   │
 │                         └───────┬───────┘                                   │
 │                                 │                                           │
@@ -31,22 +31,22 @@ curl -fsSL https://raw.githubusercontent.com/huyusong10/opencode-config/main/ins
 │              │                  │                  │                        │
 │              ▼                  ▼                  ▼                        │
 │     ┌─────────────┐    ┌─────────────┐    ┌─────────────┐                   │
-│     │fluid-worker │    │fluid-worker │    │fluid-worker │  <-- Executors    │
+│     │adapt-worker │    │adapt-worker │    │adapt-worker │  <-- Executors    │
 │     │  (Worker)   │    │  (Worker)   │    │  (Worker)   │                   │
 │     └─────────────┘    └─────────────┘    └─────────────┘                   │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**设计原则：** 用户只与 Fluid 对话。Fluid 负责评估、分类、规划，并将具体工作分派给 fluid-worker 执行。
+**设计原则：** 用户只与 Adapt 对话。Adapt 负责评估、分类、规划，并将具体工作分派给 adapt-worker 执行。
 
 ---
 
-## Fluid 工作流
+## Adapt 工作流
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                           Fluid Workflow                                    │
+│                           Adapt Workflow                                    │
 ├───────────┬───────────┬───────────┬───────────┬─────────────────────────────┤
 │ Evaluate  │ Classify  │   Plan    │  Execute  │          Deliver            │
 ├───────────┼───────────┼───────────┼───────────┼─────────────────────────────┤
@@ -109,9 +109,9 @@ Research -> Design -> Execute -> Test
 
 ---
 
-## Fluid-Worker
+## Adapt-Worker
 
-Fluid 总工指挥下的执行者，使用 OODA 循环执行任务：
+Adapt 总工指挥下的执行者，使用 OODA 循环执行任务：
 
 ```
 Observe -> Orient -> Decide -> Act
@@ -153,8 +153,8 @@ opencode-config/
 ├── opencode.jsonc              # Provider, model, plugins 配置
 ├── AGENTS.md                   # 全局规则（语言、缩进等）
 ├── agent/
-│   ├── fluid.md                # Fluid — 唯一主代理
-│   ├── fluid-worker.md         # Fluid-Worker — 执行代理
+│   ├── adapt.md                # Adapt — 唯一主代理
+│   ├── adapt-worker.md         # Adapt-Worker — 执行代理
 │   └── build.md                # 构建流程文档
 ├── rules/                      # 自动加载的行为规则
 ├── plugin/                     # Opencode 插件
@@ -167,18 +167,18 @@ opencode-config/
 
 ### 2026-03: 架构统一
 
-**重大变更：** 将分散的多 agent 架构统一为 Fluid 体系。
+**重大变更：** 将分散的多 agent 架构统一为 Adapt 体系。
 
 | 变更前 | 变更后 |
 |--------|--------|
-| 多个主代理 (janus, maestro, architect, maker) | 单一主代理 (Fluid) |
-| 多个设计代理 (arch/ux/risk/impl-designer) | Fluid 内部规划 |
-| 多个执行代理 (coder, tester, debugger) | 单一执行代理 (fluid-worker) |
-| 多个审查代理 (system-reviewer + specialists) | Fluid 内部交付验证 |
+| 多个主代理 (janus, maestro, architect, maker) | 单一主代理 (Adapt) |
+| 多个设计代理 (arch/ux/risk/impl-designer) | Adapt 内部规划 |
+| 多个执行代理 (coder, tester, debugger) | 单一执行代理 (adapt-worker) |
+| 多个审查代理 (system-reviewer + specialists) | Adapt 内部交付验证 |
 
 **原因：**
 
 - 简化用户交互模型
 - 减少上下文切换开销
 - 提高角色定位清晰度
-- Fluid 作为"总工程师"统筹全局，fluid-worker 作为"执行者"专注落地
+- Adapt 作为"总工程师"统筹全局，adapt-worker 作为"执行者"专注落地

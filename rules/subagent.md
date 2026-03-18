@@ -35,7 +35,7 @@ Needs context isolation or specialized role?
 | `@tester` | executor/ | Write and run tests |
 | `@debugger` | executor/ | Systematic bug diagnosis and fixes |
 | `@committer` | executor/ | Atomic git commits with smart messages |
-| `@fluid-worker` | executor/ | Zero-persona generic executor for Fluid |
+| `@adapt-worker` | executor/ | Zero-persona generic executor for Adapt |
 | `@researcher` | designer/ | Research technologies and patterns |
 | `@system-designer` | designer/ | Multi-perspective design orchestrator |
 | `@system-reviewer` | reviewer/ | End-of-plan delivery gate (routes to specialists) |
