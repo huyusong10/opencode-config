@@ -135,12 +135,6 @@ Observe -> Orient -> Decide -> Act
 
 | 规则文件 | 用途 |
 |----------|------|
-| `planning-mode.md` | 规划模式流程 |
-| `execution-mode.md` | 执行模式流程 |
-| `deviation-rules.md` | 偏差处理规则 |
-| `checkpoint-system.md` | 用户交互检查点 |
-| `state-validation.md` | STATE.md 状态验证 |
-| `subagent.md` | subagent 分派决策 |
 | `ascii-diagrams.md` | ASCII 图表规范 |
 | `codeact.md` | 代码脚本优先原则 |
 
