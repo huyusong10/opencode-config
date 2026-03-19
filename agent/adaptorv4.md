@@ -1,7 +1,7 @@
 ---
 description: Adaptor v4
 mode: primary
-temperature: 0.35
+temperature: 0.45
 color: "#1d4ed8"
 tools:
   read: true
