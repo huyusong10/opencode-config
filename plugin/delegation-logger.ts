@@ -1,67 +1,50 @@
 import type { Plugin } from "@opencode-ai/plugin"
-import { existsSync, mkdirSync, writeFileSync, readFileSync, unlinkSync, renameSync } from "fs"
+import { existsSync, mkdirSync, appendFileSync, readFileSync, writeFileSync } from "fs"
 import { join } from "path"
-import { Bun } from "bun"
 
 /**
  * Delegation Logger Plugin for OpenCode
  *
- * Records delegation hierarchy for adaptorv4 multi-level agent workflow.
- * Tracks parent-child session relationships, DEPTH levels, and execution results.
+ * Incremental Markdown-based delegation log with interrupt detection.
+ * Uses append-only writes for concurrent safety.
  *
- * Log file location: .log/delegation/YYYY-MM-DD/YYYY-MM-DD_HH-MM_title_sessionId.json
+ * Features:
+ * - Real-time event logging via append-only writes
+ * - User interrupt detection (MessageAbortedError)
+ * - Recovery hints generation
+ * - Human-readable Markdown format
+ *
+ * Log file location: .log/delegation/YYYY-MM-DD/YYYY-MM-DD_HH-MM_title_sessionId.md
  */
 
 // ============================================================================
 // Types
 // ============================================================================
 
-interface DelegationNode {
-  id: string
-  parent_id: string | null
-  session_id: string
-  child_session_ids: string[]
-  depth: number | null
-  agent_type: string
-  description: string
-  prompt_summary: string
-  result?: {
-    status: "success" | "error"
-    duration_ms: number
-    output_summary: string
-    tokens?: { input: number; output: number }
-  }
-}
-
-interface DelegationLog {
-  session: {
-    id: string
-    title: string
-    started_at: number
-    completed_at: number | null
-    root_agent: string
-    max_depth: number | null
-  }
-  delegations: DelegationNode[]
-  stats: {
-    total_nodes: number
-    max_actual_depth: number
-    total_tokens: { input: number; output: number }
-    total_duration_ms: number
-    by_agent: Record<string, number>
-  }
-}
-
-interface SessionInfo {
+interface SessionNode {
   id: string
   parentId: string | null
   title: string
-  agentType: string
   depth: number | null
+  agentType: string
   description: string
-  promptSummary: string
   startedAt: number
-  children: string[]
+  status: "running" | "completed" | "interrupted"
+  result?: {
+    durationMs: number
+    tokens?: { input: number; output: number }
+    outputSummary: string
+  }
+}
+
+interface InterruptInfo {
+  sessionId: string
+  reason: string
+  depth: number | null
+  parentChain: string[]
+  lastOutput: string
+  lastThinking: string | null
+  recoveryHint: string
 }
 
 // ============================================================================
@@ -70,32 +53,29 @@ interface SessionInfo {
 
 const LOG_DIR_NAME = ".log"
 const DELEGATION_DIR_NAME = "delegation"
-const LOCK_TIMEOUT_MS = 5000
-const LOCK_RETRY_MS = 50
-const PROMPT_SUMMARY_LENGTH = 200
-const OUTPUT_SUMMARY_LENGTH = 1000
+const OUTPUT_SUMMARY_LENGTH = 500
 
 // ============================================================================
 // Utility Functions
 // ============================================================================
 
 /**
- * Parse DEPTH from prompt string
- * Format: DEPTH=N at the beginning of prompt
+ * Parse DEPTH from text
+ * Format: DEPTH=N or [ADAPTOR] DEPTH=N | ...
  */
-function parseDepth(prompt: string): number | null {
-  if (!prompt) return null
-  const match = prompt.match(/^DEPTH=(\d+)/i)
+function parseDepth(text: string): number | null {
+  if (!text) return null
+  const match = text.match(/DEPTH=(\d+)/i)
   return match ? parseInt(match[1], 10) : null
 }
 
 /**
- * Parse ADAPTOR declaration from text
+ * Parse ADAPTOR declaration from title
  * Format: [ADAPTOR] DEPTH=N | 任务描述
  */
 function parseAdaptorDeclaration(text: string): { depth: number | null; description: string } | null {
   if (!text) return null
-  const match = text.match(/^\[ADAPTOR\]\s*DEPTH=(\d+)\s*\|\s*(.+)$/m)
+  const match = text.match(/\[ADAPTOR\]\s*DEPTH=(\d+)\s*\|\s*(.+)$/m)
   if (!match) return null
   return {
     depth: parseInt(match[1], 10),
@@ -113,14 +93,14 @@ function truncate(str: string, maxLength: number): string {
 }
 
 /**
- * Generate node ID
+ * Format date as ISO string without timezone
  */
-function generateNodeId(index: number): string {
-  return `node_${index + 1}`
+function formatDate(date: Date): string {
+  return date.toISOString().replace("T", " ").substring(0, 19)
 }
 
 /**
- * Format date for filename
+ * Format date for filename: YYYY-MM-DD_HH-MM
  */
 function formatDateForFilename(date: Date): string {
   const year = date.getFullYear()
@@ -132,7 +112,7 @@ function formatDateForFilename(date: Date): string {
 }
 
 /**
- * Format date for directory name (YYYY-MM-DD)
+ * Format date for directory name: YYYY-MM-DD
  */
 function formatDateForDir(date: Date): string {
   const year = date.getFullYear()
@@ -142,88 +122,36 @@ function formatDateForDir(date: Date): string {
 }
 
 /**
- * Sanitize filename (remove invalid characters)
+ * Sanitize filename by removing invalid characters
  */
 function sanitizeFilename(name: string): string {
   return name.replace(/[<>:"/\\|?*]/g, "_").substring(0, 50)
 }
 
-/**
- * Sleep for specified milliseconds
- */
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
 // ============================================================================
-// File Operations with Locking
+// Task Args Cache (for tool.execute.before -> after communication)
 // ============================================================================
 
 /**
- * Acquire file lock with timeout
+ * Cache for task tool arguments
+ * Used to pass args from tool.execute.before to tool.execute.after
+ * Key: callID, Value: task args
  */
-async function acquireLock(lockPath: string): Promise<boolean> {
-  const startTime = Date.now()
-  while (existsSync(lockPath)) {
-    if (Date.now() - startTime > LOCK_TIMEOUT_MS) {
-      return false
-    }
-    await sleep(LOCK_RETRY_MS)
-  }
-  writeFileSync(lockPath, `locked:${Date.now()}`)
-  return true
-}
-
-/**
- * Release file lock
- */
-function releaseLock(lockPath: string): void {
-  if (existsSync(lockPath)) {
-    unlinkSync(lockPath)
-  }
-}
-
-/**
- * Safely read JSON file
- */
-async function safeReadJson<T>(filePath: string): Promise<T | null> {
-  if (!existsSync(filePath)) return null
-  try {
-    const content = await Bun.file(filePath).text()
-    return JSON.parse(content) as T
-  } catch {
-    return null
-  }
-}
-
-/**
- * Safely write JSON file with atomic write (temp file + rename)
- */
-async function safeWriteJson(filePath: string, data: object): Promise<boolean> {
-  const tempPath = filePath + ".tmp"
-  try {
-    writeFileSync(tempPath, JSON.stringify(data, null, 2))
-    renameSync(tempPath, filePath)
-    return true
-  } catch (err) {
-    if (existsSync(tempPath)) {
-      unlinkSync(tempPath)
-    }
-    return false
-  }
-}
+const taskArgsCache = new Map<string, {
+  subagent_type?: string
+  description?: string
+  prompt?: string
+}>()
 
 // ============================================================================
-// Log Management
+// Markdown Log Manager
 // ============================================================================
 
-class DelegationLogManager {
+class MarkdownLogManager {
   private baseDir: string
-  private sessionCache: Map<string, SessionInfo> = new Map()
-  private parentChildMap: Map<string, string[]> = new Map() // parent -> children
-  private childParentMap: Map<string, string> = new Map() // child -> parent
-  private taskInfoCache: Map<string, { agentType: string; description: string; prompt: string }> = new Map()
-  private nodeIndexCounter: number = 0
+  private sessions: Map<string, SessionNode> = new Map()
+  private rootSessions: Set<string> = new Set()
+  private logPaths: Map<string, string> = new Map()
 
   constructor(baseDir: string) {
     this.baseDir = baseDir
@@ -242,229 +170,464 @@ class DelegationLogManager {
   }
 
   /**
-   * Generate log filename
+   * Get log file path for a root session
    */
-  private generateLogFilename(sessionId: string, title: string): string {
+  private getLogPath(sessionId: string, title: string): string {
+    if (this.logPaths.has(sessionId)) {
+      return this.logPaths.get(sessionId)!
+    }
+
+    const logDir = this.getLogDir()
     const timestamp = formatDateForFilename(new Date())
     const sanitizedTitle = sanitizeFilename(title)
-    return `${timestamp}_${sanitizedTitle}_${sessionId}.json`
+    const filename = `${timestamp}_${sanitizedTitle}_${sessionId}.md`
+    const path = join(logDir, filename)
+    this.logPaths.set(sessionId, path)
+    return path
   }
 
   /**
-   * Get log file path for a session
+   * Find root session ID by traversing parent chain
    */
-  private getLogFilePath(sessionId: string, title: string): string {
-    const logDir = this.getLogDir()
-    const filename = this.generateLogFilename(sessionId, title)
-    return join(logDir, filename)
-  }
-
-  /**
-   * Register a session
-   */
-  registerSession(info: SessionInfo): void {
-    this.sessionCache.set(info.id, info)
-
-    // Build parent-child relationship
-    if (info.parentId) {
-      this.childParentMap.set(info.id, info.parentId)
-      const children = this.parentChildMap.get(info.parentId) || []
-      if (!children.includes(info.id)) {
-        children.push(info.id)
-        this.parentChildMap.set(info.parentId, children)
-      }
-    }
-  }
-
-  /**
-   * Register task tool execution info
-   */
-  registerTaskInfo(sessionId: string, info: { agentType: string; description: string; prompt: string }): void {
-    this.taskInfoCache.set(sessionId, info)
-  }
-
-  /**
-   * Find root session ID
-   */
-  private findRootSession(sessionId: string): string {
+  private findRootSessionId(sessionId: string): string {
     let current = sessionId
-    let visited = new Set<string>()
-    while (this.childParentMap.has(current) && !visited.has(current)) {
+    const visited = new Set<string>()
+    while (true) {
+      const node = this.sessions.get(current)
+      if (!node || !node.parentId) break
+      if (visited.has(current)) break
       visited.add(current)
-      current = this.childParentMap.get(current)!
+      current = node.parentId
     }
     return current
   }
 
   /**
-   * Collect all descendant sessions
+   * Get parent chain from root to specified session
    */
-  private collectDescendants(sessionId: string): string[] {
-    const result: string[] = []
-    const queue = [sessionId]
+  private getParentChain(sessionId: string): string[] {
+    const chain: string[] = []
+    let current = sessionId
     const visited = new Set<string>()
 
-    while (queue.length > 0) {
-      const current = queue.shift()!
-      if (visited.has(current)) continue
+    while (true) {
+      const node = this.sessions.get(current)
+      if (!node || !node.parentId) break
+      if (visited.has(current)) break
       visited.add(current)
-
-      const children = this.parentChildMap.get(current) || []
-      for (const child of children) {
-        result.push(child)
-        queue.push(child)
-      }
+      chain.unshift(node.parentId)
+      current = node.parentId
     }
 
-    return result
+    return chain
   }
 
   /**
-   * Build delegation node from session info
+   * Append event to root session's log file
+   * Uses atomic append operation for concurrent safety
    */
-  private buildNode(sessionId: string, result?: DelegationNode["result"]): DelegationNode {
-    const info = this.sessionCache.get(sessionId)
-    const taskInfo = this.taskInfoCache.get(sessionId)
-    const children = this.parentChildMap.get(sessionId) || []
+  private appendEvent(rootSessionId: string, event: string): void {
+    const rootNode = this.sessions.get(rootSessionId)
+    if (!rootNode) return
 
-    const depth = info?.depth ?? (taskInfo ? parseDepth(taskInfo.prompt) : null)
-    const description = info?.description ?? taskInfo?.description ?? "Unknown task"
-    const promptSummary = taskInfo ? truncate(taskInfo.prompt, PROMPT_SUMMARY_LENGTH) : ""
-    const agentType = info?.agentType ?? taskInfo?.agentType ?? "unknown"
+    const logPath = this.getLogPath(rootSessionId, rootNode.title)
+    appendFileSync(logPath, event + "\n", "utf-8")
+  }
 
-    return {
-      id: generateNodeId(this.nodeIndexCounter++),
-      parent_id: info?.parentId ?? null,
-      session_id: sessionId,
-      child_session_ids: children,
-      depth,
-      agent_type: agentType,
-      description,
-      prompt_summary: promptSummary,
-      result,
+  /**
+   * Register a new session
+   */
+  registerSession(info: {
+    id: string
+    parentId: string | null
+    title: string
+    agentType: string
+    depth: number | null
+    description: string
+  }): void {
+    const node: SessionNode = {
+      id: info.id,
+      parentId: info.parentId,
+      title: info.title,
+      depth: info.depth,
+      agentType: info.agentType,
+      description: info.description,
+      startedAt: Date.now(),
+      status: "running",
+    }
+    this.sessions.set(info.id, node)
+
+    // Track root sessions
+    if (!info.parentId) {
+      this.rootSessions.add(info.id)
+      this.createLogFile(info.id, info.title, info.agentType, info.depth)
+    } else {
+      // Append CREATED event to root session log
+      const rootId = this.findRootSessionId(info.id)
+      this.appendEvent(rootId, this.formatCreatedEvent(node))
     }
   }
 
   /**
-   * Calculate stats from nodes
+   * Create new log file with header
    */
-  private calculateStats(nodes: DelegationNode[]): DelegationLog["stats"] {
-    const stats: DelegationLog["stats"] = {
-      total_nodes: nodes.length,
-      max_actual_depth: 0,
-      total_tokens: { input: 0, output: 0 },
-      total_duration_ms: 0,
-      by_agent: {},
+  private createLogFile(sessionId: string, title: string, agentType: string, depth: number | null): void {
+    const logPath = this.getLogPath(sessionId, title)
+    const header = `# Delegation Log
+
+## Session Info
+- **ID**: ${sessionId}
+- **Title**: ${title}
+- **Agent**: ${agentType}
+- **Depth**: ${depth ?? "N/A"}
+- **Started**: ${formatDate(new Date())}
+- **Status**: running
+
+## Event Log
+`
+    writeFileSync(logPath, header, "utf-8")
+  }
+
+  /**
+   * Format CREATED event line
+   */
+  private formatCreatedEvent(node: SessionNode): string {
+    const ts = formatDate(new Date())
+    const depthStr = node.depth !== null ? `depth=${node.depth}` : "depth=N/A"
+    const parentStr = node.parentId ? `parent=${node.parentId}` : "parent=root"
+    return `[CREATED] ${ts} | ${node.id} | ${depthStr} | ${parentStr} | ${node.description}`
+  }
+
+  /**
+   * Format COMPLETED event line
+   */
+  private formatCompletedEvent(node: SessionNode): string {
+    const ts = formatDate(new Date())
+    const duration = node.result ? Math.round(node.result.durationMs / 1000) : 0
+    const tokens = node.result?.tokens
+      ? `${node.result.tokens.input + node.result.tokens.output}`
+      : "N/A"
+    return `[COMPLETED] ${ts} | ${node.id} | duration=${duration}s | tokens=${tokens} | ${truncate(node.description, 50)}`
+  }
+
+  /**
+   * Format INTERRUPTED event line
+   */
+  private formatInterruptedEvent(sessionId: string, info: InterruptInfo): string {
+    const ts = formatDate(new Date())
+    const depthStr = info.depth !== null ? `depth=${info.depth}` : "depth=N/A"
+    return `[INTERRUPTED] ${ts} | ${sessionId} | ${depthStr} | reason=${info.reason}`
+  }
+
+  /**
+   * Mark session as completed
+   */
+  markCompleted(sessionId: string, result: SessionNode["result"]): void {
+    const node = this.sessions.get(sessionId)
+    if (!node) return
+
+    node.status = "completed"
+    node.result = result
+
+    // Only append to log if not root session (root gets final summary)
+    if (node.parentId) {
+      const rootId = this.findRootSessionId(sessionId)
+      this.appendEvent(rootId, this.formatCompletedEvent(node))
+    }
+  }
+
+  /**
+   * Handle user interrupt
+   */
+  async handleInterrupt(
+    sessionId: string,
+    client: any,
+    lastOutput: string,
+    lastThinking: string | null
+  ): Promise<void> {
+    const node = this.sessions.get(sessionId)
+    if (!node) return
+
+    node.status = "interrupted"
+
+    const rootId = this.findRootSessionId(sessionId)
+    const rootNode = this.sessions.get(rootId)
+    if (!rootNode) return
+
+    // Build interrupt info
+    const info: InterruptInfo = {
+      sessionId,
+      reason: "user_abort",
+      depth: node.depth,
+      parentChain: this.getParentChain(sessionId),
+      lastOutput,
+      lastThinking,
+      recoveryHint: await this.generateRecoveryHint(sessionId, lastThinking, lastOutput),
     }
 
-    for (const node of nodes) {
-      // Max depth
-      if (node.depth !== null && node.depth > stats.max_actual_depth) {
-        stats.max_actual_depth = node.depth
-      }
+    // Append interrupted event
+    this.appendEvent(rootId, this.formatInterruptedEvent(sessionId, info))
 
-      // Tokens
-      if (node.result?.tokens) {
-        stats.total_tokens.input += node.result.tokens.input
-        stats.total_tokens.output += node.result.tokens.output
-      }
+    // Append interrupt report section
+    const report = this.formatInterruptReport(info, rootNode, node)
+    const logPath = this.getLogPath(rootId, rootNode.title)
+    appendFileSync(logPath, report, "utf-8")
 
-      // Duration
-      if (node.result?.duration_ms) {
-        stats.total_duration_ms += node.result.duration_ms
-      }
+    // Update status in header
+    this.updateStatusInLog(rootId, "interrupted")
 
-      // By agent
-      const agent = node.agent_type
-      stats.by_agent[agent] = (stats.by_agent[agent] || 0) + 1
+    // Clean up root session tracking
+    this.rootSessions.delete(rootId)
+
+    // Clean up all sessions in this tree
+    this.cleanupSessions(rootId)
+  }
+
+  /**
+   * Format interrupt report section
+   */
+  private formatInterruptReport(info: InterruptInfo, rootNode: SessionNode, interruptedNode: SessionNode): string {
+    const parentChainStr = info.parentChain.length > 0
+      ? info.parentChain.join(" → ") + ` → ${info.sessionId}`
+      : info.sessionId
+
+    // Count completed and pending tasks
+    let completedCount = 0
+    let pendingCount = 0
+    for (const [, n] of this.sessions) {
+      if (n.status === "completed") completedCount++
+      else if (n.status === "running") pendingCount++
+    }
+
+    return `
+## Interrupt Report
+
+**Interrupted At**: ${formatDate(new Date())}
+**Reason**: ${info.reason}
+**Interrupted Session**: ${info.sessionId}
+**Depth**: ${info.depth ?? "N/A"}
+**Current Task**: ${interruptedNode.description}
+**Parent Chain**: ${parentChainStr}
+**Completed Nodes**: ${completedCount}
+**Pending Nodes**: ${pendingCount}
+
+### Last Output
+\`\`\`
+${info.lastOutput || "(no output)"}
+\`\`\`
+
+${info.lastThinking ? `### Last Thinking
+\`\`\`
+${truncate(info.lastThinking, 1000)}
+\`\`\`
+` : ""}
+### Recovery Hint
+${info.recoveryHint}
+`
+  }
+
+  /**
+   * Generate recovery hint based on current state
+   */
+  private async generateRecoveryHint(
+    sessionId: string,
+    lastThinking: string | null,
+    lastOutput: string
+  ): Promise<string> {
+    const node = this.sessions.get(sessionId)
+    if (!node) return "Unable to generate recovery hint - session not found."
+
+    // Find completed and pending sibling tasks
+    const completedTasks: string[] = []
+    const pendingTasks: string[] = []
+
+    for (const [, n] of this.sessions) {
+      if (n.parentId === node.parentId && n.id !== node.id) {
+        if (n.status === "completed") {
+          completedTasks.push(n.description)
+        } else if (n.status === "running") {
+          pendingTasks.push(n.description)
+        }
+      }
+    }
+
+    const lines: string[] = []
+
+    lines.push(`**Interrupted Task**: ${node.description}`)
+    lines.push("")
+
+    if (completedTasks.length > 0) {
+      lines.push("**Completed Tasks:**")
+      completedTasks.forEach(t => lines.push(`- ✅ ${t}`))
+      lines.push("")
+    }
+
+    if (pendingTasks.length > 0) {
+      lines.push("**Pending Tasks:**")
+      pendingTasks.forEach(t => lines.push(`- ⏳ ${t}`))
+      lines.push("")
+    }
+
+    // Add last thinking if available
+    if (lastThinking) {
+      lines.push("**Last Thinking (truncated):**")
+      lines.push(truncate(lastThinking, 300))
+      lines.push("")
+    }
+
+    // Generate suggestion based on context
+    lines.push("**Suggestion:**")
+    if (lastOutput && lastOutput.length > 50) {
+      lines.push(`Resume from "${node.description}" - there appears to be partial progress that can be continued.`)
+    } else {
+      lines.push(`Resume from "${node.description}" - restart this task with the context of completed work.`)
+    }
+
+    return lines.join("\n")
+  }
+
+  /**
+   * Update status field in log file header
+   */
+  private updateStatusInLog(rootSessionId: string, status: string): void {
+    const rootNode = this.sessions.get(rootSessionId)
+    if (!rootNode) return
+
+    const logPath = this.getLogPath(rootSessionId, rootNode.title)
+    if (!existsSync(logPath)) return
+
+    let content = readFileSync(logPath, "utf-8")
+    content = content.replace(/- \*\*Status\*\*: \w+/, `- **Status**: ${status}`)
+
+    if (status === "completed" || status === "interrupted") {
+      content = content.replace(
+        /(- \*\*Started\*\*: .+)/,
+        `$1\n- **Completed**: ${formatDate(new Date())}`
+      )
+    }
+
+    writeFileSync(logPath, content, "utf-8")
+  }
+
+  /**
+   * Finalize root session (mark as completed)
+   */
+  finalizeRootSession(rootSessionId: string): void {
+    const rootNode = this.sessions.get(rootSessionId)
+    if (!rootNode || rootNode.status !== "running") return
+
+    rootNode.status = "completed"
+    this.updateStatusInLog(rootSessionId, "completed")
+
+    // Append final summary
+    const stats = this.calculateStats(rootSessionId)
+    const summary = this.formatFinalSummary(stats)
+    const logPath = this.getLogPath(rootSessionId, rootNode.title)
+    appendFileSync(logPath, summary, "utf-8")
+
+    // Clean up root session tracking
+    this.rootSessions.delete(rootSessionId)
+
+    // Clean up all sessions belonging to this root session tree
+    this.cleanupSessions(rootSessionId)
+  }
+
+  /**
+   * Clean up all sessions in the tree rooted at the given session
+   * Called after root session is finalized or interrupted
+   */
+  private cleanupSessions(rootSessionId: string): void {
+    // Find all sessions that belong to this root's tree
+    const sessionsToDelete: string[] = [rootSessionId]
+
+    // Find all descendants
+    for (const [id, node] of this.sessions) {
+      if (this.findRootSessionId(id) === rootSessionId && id !== rootSessionId) {
+        sessionsToDelete.push(id)
+      }
+    }
+
+    // Delete from memory
+    for (const id of sessionsToDelete) {
+      this.sessions.delete(id)
+    }
+
+    // Clean up log path cache (keep file path for reference, but clear from memory)
+    this.logPaths.delete(rootSessionId)
+  }
+
+  /**
+   * Calculate statistics for a root session
+   */
+  private calculateStats(rootSessionId: string): {
+    totalNodes: number
+    completedNodes: number
+    totalDurationMs: number
+    totalTokens: { input: number; output: number }
+    maxDepth: number
+  } {
+    const stats = {
+      totalNodes: 0,
+      completedNodes: 0,
+      totalDurationMs: 0,
+      totalTokens: { input: 0, output: 0 },
+      maxDepth: 0,
+    }
+
+    for (const [, node] of this.sessions) {
+      stats.totalNodes++
+      if (node.status === "completed") stats.completedNodes++
+      if (node.depth !== null && node.depth > stats.maxDepth) {
+        stats.maxDepth = node.depth
+      }
+      if (node.result) {
+        stats.totalDurationMs += node.result.durationMs
+        if (node.result.tokens) {
+          stats.totalTokens.input += node.result.tokens.input
+          stats.totalTokens.output += node.result.tokens.output
+        }
+      }
     }
 
     return stats
   }
 
   /**
-   * Write log for a completed session
+   * Format final summary section
    */
-  async writeLog(rootSessionId: string, messages: any[]): Promise<void> {
-    const rootInfo = this.sessionCache.get(rootSessionId)
-    if (!rootInfo) return
+  private formatFinalSummary(stats: {
+    totalNodes: number
+    completedNodes: number
+    totalDurationMs: number
+    totalTokens: { input: number; output: number }
+    maxDepth: number
+  }): string {
+    const duration = Math.round(stats.totalDurationMs / 1000)
+    const totalTokens = stats.totalTokens.input + stats.totalTokens.output
 
-    const allSessionIds = [rootSessionId, ...this.collectDescendants(rootSessionId)]
-    const nodes: DelegationNode[] = []
-    this.nodeIndexCounter = 0
+    return `
+## Final Summary
 
-    for (const sessionId of allSessionIds) {
-      // Extract result from messages
-      const result = this.extractResultFromMessages(sessionId, messages)
-      const node = this.buildNode(sessionId, result)
-      nodes.push(node)
-    }
-
-    const log: DelegationLog = {
-      session: {
-        id: rootSessionId,
-        title: rootInfo.title,
-        started_at: rootInfo.startedAt,
-        completed_at: Date.now(),
-        root_agent: rootInfo.agentType,
-        max_depth: rootInfo.depth,
-      },
-      delegations: nodes,
-      stats: this.calculateStats(nodes),
-    }
-
-    const logPath = this.getLogFilePath(rootSessionId, rootInfo.title)
-    const lockPath = logPath + ".lock"
-
-    const acquired = await acquireLock(lockPath)
-    if (!acquired) {
-      console.error(`[delegation-logger] Failed to acquire lock for ${logPath}`)
-      return
-    }
-
-    try {
-      await safeWriteJson(logPath, log)
-    } finally {
-      releaseLock(lockPath)
-    }
+- **Total Nodes**: ${stats.totalNodes}
+- **Completed Nodes**: ${stats.completedNodes}
+- **Max Depth**: ${stats.maxDepth}
+- **Total Duration**: ${duration}s
+- **Total Tokens**: ${totalTokens} (input: ${stats.totalTokens.input}, output: ${stats.totalTokens.output})
+`
   }
 
   /**
-   * Extract result from session messages
+   * Check if session is a root session
    */
-  private extractResultFromMessages(
-    sessionId: string,
-    messages: any[],
-  ): DelegationNode["result"] | undefined {
-    // Find the last text part from assistant messages
-    const lastAssistantText = messages
-      .filter((m: any) => m.role === "assistant")
-      .flatMap((m: any) => m.parts || [])
-      .filter((p: any) => p.type === "text")
-      .map((p: any) => p.text)
-      .join("\n")
+  isRootSession(sessionId: string): boolean {
+    return this.rootSessions.has(sessionId)
+  }
 
-    // Find step-finish part for tokens and cost
-    const stepFinish = messages
-      .filter((m: any) => m.role === "assistant")
-      .flatMap((m: any) => m.parts || [])
-      .find((p: any) => p.type === "step-finish")
-
-    const info = this.sessionCache.get(sessionId)
-    const now = Date.now()
-    const durationMs = info ? now - info.startedAt : 0
-
-    return {
-      status: "success",
-      duration_ms: durationMs,
-      output_summary: truncate(lastAssistantText, OUTPUT_SUMMARY_LENGTH),
-      tokens: stepFinish?.tokens
-        ? {
-            input: stepFinish.tokens.input || 0,
-            output: stepFinish.tokens.output || 0,
-          }
-        : undefined,
-    }
+  /**
+   * Get session node by ID
+   */
+  getSession(sessionId: string): SessionNode | undefined {
+    return this.sessions.get(sessionId)
   }
 }
 
@@ -473,115 +636,167 @@ class DelegationLogManager {
 // ============================================================================
 
 export const DelegationLoggerPlugin: Plugin = async ({ directory, client }) => {
-  const manager = new DelegationLogManager(directory)
-  const rootSessionIds = new Set<string>()
+  const manager = new MarkdownLogManager(directory)
 
   return {
     /**
-     * Handle events for session lifecycle
+     * Handle session lifecycle events
      */
     event: async ({ event }) => {
       // Track session creation
       if (event.type === "session.created") {
         const info = event.properties.info
         const parentId = info.parentID || null
-
-        // Try to extract DEPTH and description from title
         const title = info.title || ""
-        let depth: number | null = null
-        let description = title
 
-        // Check if title contains [ADAPTOR] DEPTH=N | description
+        // Parse DEPTH and description
         const adaptorDecl = parseAdaptorDeclaration(title)
-        if (adaptorDecl) {
-          depth = adaptorDecl.depth
-          description = adaptorDecl.description
-        }
+        const depth = adaptorDecl?.depth ?? parseDepth(title)
+        const description = adaptorDecl?.description ?? title
 
-        // Extract agent type from title if present (@agent_name subagent)
+        // Extract agent type from title if present
         const agentMatch = title.match(/@(\w+)\s+subagent/)
         const agentType = agentMatch ? agentMatch[1] : "adaptorv4"
 
         manager.registerSession({
           id: info.id,
           parentId,
-          title: info.title,
+          title,
           agentType,
           depth,
           description,
-          promptSummary: "",
-          startedAt: info.time?.created || Date.now(),
-          children: [],
         })
 
-        // Track root sessions
-        if (!parentId) {
-          rootSessionIds.add(info.id)
-        }
+        await client.app.log({
+          service: "delegation-logger",
+          level: "info",
+          message: `Session created: ${info.id} (depth=${depth ?? "N/A"}, parent=${parentId ?? "root"})`,
+        })
       }
 
-      // Handle session completion
+      // Handle session completion or interrupt
       if (event.type === "session.idle") {
         const sessionId = event.properties.sessionID
+        const node = manager.getSession(sessionId)
+        if (!node) return
 
-        // Check if this is a root session
-        if (rootSessionIds.has(sessionId)) {
-          try {
-            // Get all messages for this session
-            const result = await client.session.messages({ path: { id: sessionId } })
-            const messages = result.data || []
+        try {
+          // Get session messages using the correct API
+          // session.messages returns Array<{ info: Message; parts: Part[] }>
+          const messages = await client.session.messages({ path: { id: sessionId } })
+          if (!messages || messages.length === 0) return
 
-            await manager.writeLog(sessionId, messages)
+          // Find last assistant message
+          const lastAssistantData = [...messages]
+            .reverse()
+            .find((m) => m.info.role === "assistant")
 
-            // Clean up
-            rootSessionIds.delete(sessionId)
-          } catch (err) {
-            await client.app.log({
-              service: "delegation-logger",
-              level: "error",
-              message: `Failed to write log for session ${sessionId}: ${err}`,
-            })
+          if (lastAssistantData) {
+            const lastAssistant = lastAssistantData.info
+            const parts = lastAssistantData.parts
+
+            // Check for interrupt (AbortedError)
+            const isInterrupted = lastAssistant.error?.name === "MessageAbortedError"
+
+            if (isInterrupted) {
+              // Extract last output and thinking from parts
+              const textParts = parts
+                ?.filter((p: any) => p.type === "text")
+                .map((p: any) => p.text)
+                .join("\n") || ""
+
+              const reasoningParts = parts
+                ?.filter((p: any) => p.type === "reasoning")
+                .map((p: any) => p.text)
+                .join("\n") || null
+
+              await manager.handleInterrupt(sessionId, client, textParts, reasoningParts)
+
+              await client.app.log({
+                service: "delegation-logger",
+                level: "warn",
+                message: `Session interrupted: ${sessionId} - Interrupt report written to log`,
+              })
+            } else {
+              // Normal completion
+              const stepFinish = parts?.find((p: any) => p.type === "step-finish")
+
+              manager.markCompleted(sessionId, {
+                durationMs: Date.now() - node.startedAt,
+                tokens: stepFinish?.tokens
+                  ? {
+                      input: stepFinish.tokens.input || 0,
+                      output: stepFinish.tokens.output || 0,
+                    }
+                  : undefined,
+                outputSummary: truncate(
+                  parts
+                    ?.filter((p: any) => p.type === "text")
+                    .map((p: any) => p.text)
+                    .join("\n") || "",
+                  OUTPUT_SUMMARY_LENGTH
+                ),
+              })
+
+              // Finalize root session
+              if (manager.isRootSession(sessionId)) {
+                manager.finalizeRootSession(sessionId)
+
+                await client.app.log({
+                  service: "delegation-logger",
+                  level: "info",
+                  message: `Root session completed: ${sessionId}`,
+                })
+              }
+            }
           }
+        } catch (err) {
+          await client.app.log({
+            service: "delegation-logger",
+            level: "error",
+            message: `Failed to process session.idle for ${sessionId}: ${err}`,
+          })
         }
       }
     },
 
     /**
      * Track task tool executions
+     * Use tool.execute.before to capture args, then tool.execute.after to log
      */
-    "tool.execute.after": async (input, output) => {
+    "tool.execute.before": async (input, output) => {
       if (input.tool !== "task") return
 
-      const args = input.args as {
+      // Store args for use in tool.execute.after
+      // output.args contains the tool arguments
+      const args = output.args as {
         subagent_type?: string
         description?: string
         prompt?: string
-        task_id?: string
-      }
+      } | undefined
 
+      if (args) {
+        taskArgsCache.set(input.callID, args)
+      }
+    },
+
+    "tool.execute.after": async (input) => {
+      if (input.tool !== "task") return
+
+      // Retrieve args stored by tool.execute.before
+      const args = taskArgsCache.get(input.callID)
       if (!args) return
 
-      // Extract child session ID from output
-      const outputText = output.output || ""
-      const sessionIdMatch = outputText.match(/task_id:\s*([^\s]+)/)
-      const childSessionId = sessionIdMatch ? sessionIdMatch[1] : null
+      // Clean up cache
+      taskArgsCache.delete(input.callID)
 
-      if (childSessionId && args.prompt) {
-        manager.registerTaskInfo(childSessionId, {
-          agentType: args.subagent_type || "unknown",
-          description: args.description || "Unknown task",
-          prompt: args.prompt,
-        })
+      const depth = parseDepth(args.prompt || "")
 
-        // Try to extract DEPTH from prompt
-        const depth = parseDepth(args.prompt)
-
-        await client.app.log({
-          service: "delegation-logger",
-          level: "info",
-          message: `Task delegated: ${args.description} (DEPTH=${depth ?? "N/A"}, agent=${args.subagent_type})`,
-        })
-      }
+      await client.app.log({
+        service: "delegation-logger",
+        level: "info",
+        message: `Task delegated: ${args.description} (depth=${depth ?? "N/A"}, agent=${args.subagent_type})`,
+      })
     },
   }
 }
