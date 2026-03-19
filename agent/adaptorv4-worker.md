@@ -1,6 +1,6 @@
 ---
 description: Adaptor v4 Worker
-mode: agent
+mode: subagent
 temperature: 0.15
 tools:
   read: true
