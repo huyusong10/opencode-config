@@ -269,7 +269,19 @@
     // - 超过最大迭代次数 → 停止循环（安全阀）
     //
     // 状态文件: .claude/ralph-loop.local.md
-    "./plugin/ralph.ts"
+    "./plugin/ralph.ts",
+
+    // Delegation Logger 委派日志插件 - 记录 adaptorv4 多层委派结构
+    //
+    // 记录内容:
+    // - 委派层级树结构（parent-child 关系）
+    // - 每层 DEPTH、agent_type、description
+    // - 执行结果（耗时、token 消耗、输出摘要）
+    //
+    // 日志位置: .log/delegation/YYYY-MM-DD/YYYY-MM-DD_HH-MM_title_sessionId.json
+    //
+    // 用途: 事后分析委派效率、层级深度是否合理、迭代优化
+    "./plugin/delegation-logger.ts"
   ],
 
   // ============================================================================
