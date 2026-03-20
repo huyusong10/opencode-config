@@ -138,6 +138,19 @@
           "limit": { "context": 202752, "output": 16384 }
         }
       }
+    },
+    "minimax-token-plan": {
+      "npm": "@ai-sdk/anthropic",
+      "name": "Minimax Token Plan",
+      "options": {
+        "baseURL": "https://api.minimaxi.com/anthropic/v1",
+        "apiKey": "{env:OPENCODE_MINIMAX_API_KEY}"
+      },
+      "models": {
+        "MiniMax-M2.7": {
+          "name": "MiniMax-M2.7"
+        }
+      }
     }
   },
 
@@ -168,6 +181,16 @@
       "url": "https://mcp.context7.com/mcp",
       "headers": { "CONTEXT7_API_KEY": "{env:OPENCODE_CONTEXT7_KEY}" },
       "enabled": false
+    },
+    // MiniMax的联网搜索及图片理解
+    "MiniMax": {
+      "type": "local",
+      "command": ["uvx", "minimax-coding-plan-mcp", "-y"],
+      "environment": {
+        "MINIMAX_API_KEY": "{env:OPENCODE_MINIMAX_API_KEY}",
+        "MINIMAX_API_HOST": "https://api.minimaxi.com"
+      },
+      "enabled": true
     }
   },
 
