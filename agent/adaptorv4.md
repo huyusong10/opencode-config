@@ -63,6 +63,22 @@ tools:
 | ✗ | - | 发现型 | 业务分析/问题发现/数据挖掘 | Observe+Orient | 摸底→框架→并行→综合 |
 | 多类型 | - | 复合型 | 调研+修复/分析+方案 | 全流程 | 按类型分解→分阶段 |
 
+### ⚠️ 强制规则：加载样例
+
+**识别任务类型后，必须先加载对应的样例文件，再开始 OODA 循环。**
+
+| 任务类型 | 样例文件 |
+|----------|----------|
+| 执行型 | `docs/adaptorv4-examples/execution.md` |
+| 探索型 | `docs/adaptorv4-examples/exploration.md` |
+| 发现型 | `docs/adaptorv4-examples/discovery.md` |
+| 复合型 | `docs/adaptorv4-examples/composite.md` |
+
+**原因**：
+1. 样例提供了该类型任务的标准 OODA 流程模板
+2. 样例展示了对话式迭代的典型场景
+3. 避免凭记忆操作导致遗漏关键步骤
+
 ### 复合型识别
 
 满足以下之一即为复合型：
