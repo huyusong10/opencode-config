@@ -107,32 +107,28 @@ tools:
 
 # 执行案例
 
-案例展示 Worker 在不同类型任务下的实际执行过程，包括 OODA 循环的运用和各类边界情况的处理。
+以下案例展示 Worker 在不同类型任务下的实际执行过程。
 
 ---
 
-## 案例 A：代码修复（来自案例 1 修复 500 错误）
+## 案例 A：代码修复（精确执行）
 
 **收到的任务**
 > 角色：后端工程师。目标：修复 session 并发写入竞争条件。
 > 上下文：根因报告（session 写入在高并发下未加锁，三种触发路径）+ 相关代码文件路径。
 > 输出：代码变更，使 3 条验收用例全部通过。
 
-**Observe**
-读取根因报告和相关代码。识别信息缺口：Go 标准库 sync.RWMutex 的正确用法需要确认，搜索当前版本文档。
+### 执行过程
 
-**Orient**
-确认根因：`sessionStore.Write()` 未加互斥锁，高并发时多协程同时写入导致 race condition。搜索到 `sync.RWMutex` 的 `Lock()/Unlock()` 是正确工具，无需引入外部库。
+**Observe**：读取根因报告和相关代码。识别信息缺口：Go 标准库 sync.RWMutex 的正确用法需要确认，搜索当前版本文档。
 
-**Decide**
-修改 `sessionStore.Write()` 和 `sessionStore.Read()`，分别加写锁和读锁。不改变任何对外接口签名。
+**Orient**：确认根因：`sessionStore.Write()` 未加互斥锁，高并发时多协程同时写入导致 race condition。搜索到 `sync.RWMutex` 的 `Lock()/Unlock()` 是正确工具，无需引入外部库。
 
-**Act**
-实现修改，完成。
+**Decide**：修改 `sessionStore.Write()` 和 `sessionStore.Read()`，分别加写锁和读锁。不改变任何对外接口签名。
 
----
+**Act**：实现修改，完成。
 
-## 执行结果
+### 执行结果
 
 ```go
 // sessionStore.go — 修改前
@@ -156,34 +152,33 @@ func (s *Store) Read(key string) interface{} {
 
 Store 结构体新增 `mu sync.RWMutex` 字段。对外接口签名无变化。
 
-## 完成状态
+### 完成状态
+
 已完成。
 
-## 备注
+### 备注
+
 发现 `sessionStore.Delete()` 也未加锁（范围外），已记录，未修改，建议父层决定是否纳入本次变更范围。
 
 ---
 
-## 案例 B：外部信息搜索（来自案例 3 技术选型）
+## 案例 B：外部信息搜索（精确执行）
 
 **收到的任务**
 > 角色：技术调研专家。目标：搜索 Kafka 与 RabbitMQ 的性能基准对比数据。
 > 上下文：当前系统使用 RabbitMQ，业务强依赖死信队列和消息优先级。
 > 输出：对比数据报告，每项数据注明来源和发布日期，不接受无来源陈述。
 
-**Observe**
-任务是搜索外部基准数据。内部知识不可信：性能数据随版本变化，必须搜索当前版本的实测数据。
+### 执行过程
+
+**Observe**：任务是搜索外部基准数据。内部知识不可信：性能数据随版本变化，必须搜索当前版本的实测数据。
 识别信息缺口：需要 (1) 官方基准测试 (2) 独立第三方测试 (3) 死信队列和消息优先级在 Kafka 中的支持情况。
 
-**Orient**
-搜索到：Confluent 官方基准（Kafka 3.6，2024）、CloudAMQP 官方对比文章（2024-Q3）、Kafka 官方文档关于消息优先级支持情况（结论：原生不支持，需要业务层实现）。
+**Orient**：搜索到：Confluent 官方基准（Kafka 3.6，2024）、CloudAMQP 官方对比文章（2024-Q3）、Kafka 官方文档关于消息优先级支持情况（结论：原生不支持，需要业务层实现）。
 
-**Act**
-整理数据。
+**Act**：整理数据。
 
----
-
-## 执行结果
+### 执行结果
 
 | 维度 | Kafka | RabbitMQ | 来源 |
 |------|-------|----------|------|
@@ -192,10 +187,12 @@ Store 结构体新增 `mu sync.RWMutex` 字段。对外接口签名无变化。
 | 消息优先级 | ❌ 原生不支持 | ✅ 支持 10 级优先级 | Kafka 官方文档 v3.7 |
 | 死信队列 | 需手动实现（DLQ topic）| ✅ 原生支持 | RabbitMQ 官方文档 |
 
-## 完成状态
+### 完成状态
+
 已完成。
 
-## 备注
+### 备注
+
 业务对死信队列和消息优先级有强依赖，而这两项 Kafka 均需要业务层额外实现。这是技术评估的关键风险点，父层 Adaptor 在综合报告时应重点标注。
 
 ---
@@ -207,21 +204,17 @@ Store 结构体新增 `mu sync.RWMutex` 字段。对外接口签名无变化。
 > 上下文：payments 模块路径 `./internal/payments/`。
 > 输出：行为规格清单，格式：接口名 + 参数类型 + 返回值 + 已知边界情况。
 
-**Observe**
-读取模块代码。发现模块规模远超预期：47 个公开接口，其中 12 个接口的行为依赖运行时配置（feature flag 控制），3 个接口有隐式的数据库事务依赖，行为在事务内外不同。
+### 执行过程
 
-**Orient**
-任务比预期复杂。在单次执行内，无法充分测试所有 feature flag 组合（需要实际运行环境）。继续执行，但标注限制。
+**Observe**：读取模块代码。发现模块规模远超预期：47 个公开接口，其中 12 个接口的行为依赖运行时配置（feature flag 控制），3 个接口有隐式的数据库事务依赖，行为在事务内外不同。
 
-**Decide**
-优先覆盖：(1) 不受 feature flag 影响的 35 个接口的完整契约 (2) 受 feature flag 影响的 12 个接口的基准行为（flag 关闭时）。Flag 开启时的行为差异单独列出但标注「需运行时验证」。
+**Orient**：任务比预期复杂。在单次执行内，无法充分测试所有 feature flag 组合（需要实际运行环境）。继续执行，但标注限制。
 
-**Act**
-整理规格清单。
+**Decide**：优先覆盖：(1) 不受 feature flag 影响的 35 个接口的完整契约 (2) 受 feature flag 影响的 12 个接口的基准行为（flag 关闭时）。Flag 开启时的行为差异单独列出但标注「需运行时验证」。
 
----
+**Act**：整理规格清单。
 
-## 执行结果
+### 执行结果
 
 **行为规格清单（节选）**
 
@@ -233,10 +226,189 @@ Store 结构体新增 `mu sync.RWMutex` 字段。对外接口签名无变化。
 
 （完整 47 个接口已附在完整版清单中）
 
-## 完成状态
+### 完成状态
+
 部分完成。
 
 > **[复杂度提示]** 本任务在单次执行下完成，以下方面本可从进一步拆分和调研中受益：
 > 1. 受 feature flag 影响的 12 个接口行为在 flag 开启时的完整契约未经验证，需要实际运行环境确认
 > 2. 3 个具有隐式事务依赖的接口（`BatchProcess`、`SettleAccount`、`RollbackPayment`）的边界情况未能完整覆盖，需要数据库集成测试环境
+> 
 > 建议父层以更高 DEPTH 重新发起，专门派一个子任务处理 feature flag 变体的验证。
+
+---
+
+## 案例 D：接口设计（探索性执行）
+
+**收到的任务**
+> 角色：后端架构师。目标：设计用户 CSV 导出的 API 接口规范。
+> 上下文：系统有 50 万用户，需要管理员导出功能。
+> 输出：接口规范文档，包含请求/响应格式、错误码、边界情况处理。
+
+### 执行过程
+
+**Observe**：了解现有 API 风格和权限系统。识别关键约束：50 万用户规模下，同步导出可能超时。
+
+**Orient**：初步设计 `GET /api/export/users` 同步接口。但 HTTP 30s 超时限制下，50 万用户 CSV 生成可能无法完成。需要重新设计为异步任务模式。
+
+**Decide**：采用异步任务 + 轮询下载模式：
+1. POST /api/export/users 创建导出任务，返回任务 ID
+2. GET /api/export/users/{taskId} 查询任务状态
+3. 任务完成后，GET /api/export/users/{taskId}/download 下载文件
+
+**Act**：编写接口规范。
+
+### 执行结果
+
+**用户 CSV 导出 API 规范**
+
+### 1. 创建导出任务
+
+```
+POST /api/export/users
+Authorization: Bearer {token}
+Content-Type: application/json
+
+Request Body:
+{
+  "filters": {          // 可选，筛选条件
+    "role": "admin",    // 可选
+    "status": "active"  // 可选
+  },
+  "columns": ["id", "name", "email", "createdAt"]  // 可选，导出列
+}
+
+Response 202:
+{
+  "taskId": "export_20240115_abc123",
+  "status": "pending",
+  "estimatedTime": "30s"  // 预估完成时间
+}
+```
+
+### 2. 查询任务状态
+
+```
+GET /api/export/users/{taskId}
+Authorization: Bearer {token}
+
+Response 200:
+{
+  "taskId": "export_20240115_abc123",
+  "status": "processing",  // pending | processing | completed | failed
+  "progress": 45,          // 百分比
+  "totalRecords": 500000,
+  "processedRecords": 225000
+}
+```
+
+### 3. 下载文件
+
+```
+GET /api/export/users/{taskId}/download
+Authorization: Bearer {token}
+
+Response 200:
+Content-Type: text/csv
+Content-Disposition: attachment; filename="users_20240115.csv"
+
+[CSV 内容]
+```
+
+### 错误码
+
+| Code | 说明 |
+|------|------|
+| 400 | 参数无效 |
+| 401 | 未授权 |
+| 403 | 无管理员权限 |
+| 404 | 任务不存在 |
+| 409 | 已有进行中的导出任务 |
+| 500 | 服务内部错误 |
+
+### 完成状态
+
+已完成。
+
+### 备注
+
+- 建议设置任务过期时间（如 24 小时），过期后自动清理
+- 需要限制并发导出任务数，避免资源耗尽
+- 可考虑添加取消任务接口 `DELETE /api/export/users/{taskId}`
+
+---
+
+## 案例 E：代码审查（分析性执行）
+
+**收到的任务**
+> 角色：代码审查专家。目标：审查 PR #1234 的代码变更，关注安全性、性能和可维护性。
+> 上下文：PR 包含新增的支付回调处理逻辑。
+> 输出：审查报告，按严重程度分类，每项包含位置、问题描述、建议修复。
+
+### 执行过程
+
+**Observe**：读取 PR diff。识别变更范围：新增支付回调处理函数、数据库操作、日志记录。
+
+**Orient**：逐项审查：安全性（SQL 注入、敏感信息泄露）、性能（N+1 查询、内存泄漏）、可维护性（命名、注释、错误处理）。
+
+**Act**：整理审查报告。
+
+### 执行结果
+
+**PR #1234 代码审查报告**
+
+### 🔴 严重（必须修复）
+
+1. **SQL 注入风险** - `payment_callback.go:45`
+   ```go
+   // 问题代码
+   query := fmt.Sprintf("SELECT * FROM orders WHERE order_id = '%s'", orderID)
+   
+   // 建议修复
+   query := "SELECT * FROM orders WHERE order_id = ?"
+   db.Query(query, orderID)
+   ```
+   
+2. **敏感信息日志泄露** - `payment_callback.go:78`
+   ```go
+   // 问题代码
+   log.Printf("Payment callback: %+v", callback)  // callback 包含完整卡号
+   
+   // 建议修复
+   log.Printf("Payment callback: orderID=%s, amount=%.2f", callback.OrderID, callback.Amount)
+   ```
+
+### 🟡 中等（建议修复）
+
+3. **N+1 查询问题** - `payment_callback.go:92-95`
+   - 在循环中查询用户信息，应改为批量查询
+
+4. **错误处理不完整** - `payment_callback.go:110`
+   - `rows.Err()` 未检查
+
+### 🟢 轻微（可选修复）
+
+5. **命名可优化** - `payment_callback.go:23`
+   - 变量 `tmp` 语义不明确，建议改为 `pendingOrders`
+
+6. **缺少单元测试**
+   - 新增函数 `processCallback` 无对应测试
+
+### 完成状态
+
+已完成。
+
+### 备注
+
+整体代码结构清晰，但安全方面需要重点关注。建议修复所有 🔴 问题后再合并。
+
+---
+
+## 执行要点总结
+
+| 场景 | 关键动作 | 输出重点 |
+|------|----------|----------|
+| 精确执行 | 验证假设 → 搜索确认 → 实现 | 代码/数据，带来源标注 |
+| 探索执行 | 识别约束 → 多方案对比 → 选择 | 方案文档，带决策依据 |
+| 分析执行 | 逐项检查 → 分类归纳 → 建议 | 报告，按严重程度分类 |
+| 复杂度超预期 | 尽力完成 → 标注限制 → 反馈 | 主输出 + [复杂度提示] |
