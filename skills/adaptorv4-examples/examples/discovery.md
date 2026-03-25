@@ -87,15 +87,53 @@ PASS条件: 覆盖近 7 天日志
   - 新增：`DatabaseTimeout`（本周首次出现）（依据: 时间分布对比）
   - 突增：`ConnectionRefused`（本周比上周增长 300%）（依据: 周环比分析）
 
-#### 结论挑战
+#### 对抗性验证
 
-```
-Q: 这些错误有业务影响吗？
-A: DatabaseTimeout 导致部分用户请求失败；ConnectionRefused 影响支付回调。
+```markdown
+[反向验证委托]
+目标结论: 发现 DatabaseTimeout 新出现，ConnectionRefused 频率突增
+挑战目标: 证明发现遗漏或误判
+输出要求: 挑战报告 (A/B/C级) + 证据
 
-Q: 为什么 DatabaseTimeout 本周首次出现？
-A: 需要进一步分析，可能与数据库变更有关。
+Task(
+  subagent_type: "adaptorv4-worker",
+  prompt: """
+  [挑战模式]
+  
+  目标结论: 发现 DatabaseTimeout 新出现，ConnectionRefused 频率突增 300%
+  相关上下文:
+  - 数据来源：日志分析系统
+  - 时间范围：本周 vs 上周
+  
+  你的任务: 尝试证明上述发现是错误的或遗漏了关键信息。
+  """
+)
 ```
+
+**挑战者返回**：
+```markdown
+## 挑战报告
+
+**目标结论**: 发现 DatabaseTimeout 新出现，ConnectionRefused 频率突增 300%
+
+**反向假设**: 假设发现是错误的或不完整
+1. DatabaseTimeout 可能之前存在但未被记录
+2. ConnectionRefused 增长可能是监控变化而非真实增长
+3. 可能遗漏了其他更重要的异常
+
+**证据搜寻**:
+- 假设1: 检查历史日志归档 → 确认上周确实无此错误 (依据: 归档日志)
+- 假设2: 检查监控系统变更 → 无变更记录 (依据: 变更日志)
+- 假设3: 扩展异常搜索范围 → 发现 AuthTimeout 也有轻微增长 (依据: 全量日志分析)
+
+**挑战结果**: B级
+
+发现基本正确，但补充：
+- AuthTimeout 也有轻微增长趋势，建议纳入监控
+- DatabaseTimeout 根因需进一步分析
+```
+
+**处理**：B级 → 可声称完成，补充发现点
 
 **最终发现**：
 1. `DatabaseTimeout` 新出现，优先级高

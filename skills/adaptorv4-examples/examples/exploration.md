@@ -87,15 +87,52 @@ PASS条件: 包含性能、功能、推荐理由
 - sonic：最快，但需 CGO，特定场景有 bug（依据: GitHub issues 统计）
 - jsonparser：最快解析，但只读不写（依据: benchmark + 功能测试）
 
-#### 结论挑战
+#### 对抗性验证
 
-```
-Q: sonic 最快，为什么不是默认推荐？
-A: 需要 CGO，跨平台编译复杂；部分场景有已知 bug。
+```markdown
+[反向验证委托]
+目标结论: 默认使用 encoding/json，性能敏感场景使用 json-iterator
+挑战目标: 证明结论错误或遗漏关键因素
+输出要求: 挑战报告 (A/B/C级) + 证据
 
-Q: 性能差异在实际项目中影响多大？
-A: 小项目差异可忽略。大项目、高频场景才值得换。
+Task(
+  subagent_type: "adaptorv4-worker",
+  prompt: """
+  [挑战模式]
+  
+  目标结论: JSON 库选型结论：默认 encoding/json，性能敏感用 json-iterator
+  相关上下文:
+  - sonic 最快但有 CGO 依赖和已知 bug
+  - json-iterator 100% 兼容标准库
+  - 小项目性能差异可忽略
+  
+  你的任务: 尝试证明上述结论是错误的。
+  """
+)
 ```
+
+**挑战者返回**：
+```markdown
+## 挑战报告
+
+**目标结论**: 默认使用 encoding/json，性能敏感场景使用 json-iterator
+
+**反向假设**: 假设结论是错误的
+1. json-iterator 可能有兼容性问题未被发现
+2. sonic 的 bug 可能在我们的场景不会触发
+3. 可能存在更好的替代方案未考虑
+
+**证据搜寻**:
+- 假设1: 搜索 json-iterator 兼容性问题 → 发现极少数边界 case (依据: GitHub issues)
+- 假设2: 检查 sonic bug 详情 → 影响 struct tag 场景，我们未使用 (依据: issue 分析)
+- 假设3: 搜索其他 JSON 库 → 未发现更优选项 (依据: web search)
+
+**挑战结果**: A级
+
+反向假设均未找到强证据支持，结论可靠。
+```
+
+**处理**：A级 → 可声称完成
 
 **最终推荐**：
 - 默认：`encoding/json`（稳定、无依赖）
