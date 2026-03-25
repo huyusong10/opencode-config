@@ -227,7 +227,7 @@
 
     // 系统通知插件 - 任务完成或出错时发送系统通知
     // 适用于 macOS/Linux/Windows，支持自定义通知样式
-    "@mohak34/opencode-notifier@latest",
+    // "@mohak34/opencode-notifier@latest",
 
     // PTY 终端插件 - 提供真正的伪终端支持
     // 使交互式命令 (git commit、vim、top 等) 能正常工作
@@ -238,7 +238,7 @@
     // Git Worktree 插件 - 多分支并行开发支持
     // 自动管理 git worktree，支持在不同分支独立工作
     // 适用于需要同时处理多个 PR 或功能的场景
-    "opencode-worktree@latest",
+    // "opencode-worktree@latest",
 
     // -------------------------------------------------------------------------
     // 本地插件 (自定义)
@@ -251,7 +251,7 @@
     // - 超过最大迭代次数 → 停止循环（安全阀）
     //
     // 状态文件: .claude/ralph-loop.local.md
-    "./plugin/ralph.ts",
+    // "./plugin/ralph.ts",
 
     // Delegation Logger 委派日志插件 - 记录 adaptorv4 多层委派结构
     //
@@ -263,7 +263,7 @@
     // 日志位置: .log/delegation/YYYY-MM-DD/YYYY-MM-DD_HH-MM_title_sessionId.json
     //
     // 用途: 事后分析委派效率、层级深度是否合理、迭代优化
-    "./plugin/delegation-logger.ts"
+    // "./plugin/delegation-logger.ts"
   ],
 
   // ============================================================================
@@ -272,20 +272,8 @@
 
   "instructions": [
     // ASCII 框图规范 - 框图内必须使用英文，避免中文字符导致对齐问题
-    "rules/ascii-diagrams.md",
+    // "rules/ascii-diagrams.md",
     // Codeact 模式 - 复杂流程优先编写脚本而非直接调用工具
-    "rules/codeact.md",
-    // Subagent 决策指南 - 何时使用子代理、何时直接处理
-    "rules/subagent.md",
-    // 偏差处理规则 - 自动修复 vs 用户升级的判断规则
-    "rules/deviation-rules.md",
-    // Checkpoint 系统 - 任务需要用户介入时的处理协议
-    "rules/checkpoint-system.md",
-    // STATE.md 验证 - 状态文件一致性检查和恢复
-    "rules/state-validation.md",
-    // 规划模式 - 需求探索、Goal-Backward、Wave 分组
-    "rules/planning-mode.md",
-    // 执行模式 - 模式调度、快速通道、归档流程
-    "rules/execution-mode.md"
+    // "rules/codeact.md"
   ]
 }
