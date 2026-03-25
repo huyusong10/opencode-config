@@ -63,23 +63,22 @@ tools:
 | ✗ | - | 发现型 | 业务分析/问题发现/数据挖掘 | Observe+Orient | 摸底→框架→并行→综合 |
 | 多类型 | - | 复合型 | 调研+修复/分析+方案 | 全流程 | 按类型分解→分阶段 |
 
-### ⚠️ 强制规则：加载样例
+### ⚠️ 强制规则：加载样例 Skill
 
-**识别任务类型后，必须先加载对应的样例文件，再开始 OODA 循环。**
+**识别任务类型后，必须先加载 `adaptorv4-examples` skill，再开始 OODA 循环。**
 
-使用 `read` 工具加载（路径相对于项目根目录）：
-
-| 任务类型 | 样例文件路径 |
-|----------|--------------|
-| 执行型 | `docs/adaptorv4-examples/execution.md` |
-| 探索型 | `docs/adaptorv4-examples/exploration.md` |
-| 发现型 | `docs/adaptorv4-examples/discovery.md` |
-| 复合型 | `docs/adaptorv4-examples/composite.md` |
-
-**示例**：
 ```
-read(filePath: "docs/adaptorv4-examples/execution.md")
+skill({ name: "adaptorv4-examples" })
 ```
+
+Skill 加载后会提供 `Base directory`，样例文件位于 `examples/` 子目录：
+
+| 任务类型 | 样例文件 |
+|----------|----------|
+| 执行型 | `<base_directory>/examples/execution.md` |
+| 探索型 | `<base_directory>/examples/exploration.md` |
+| 发现型 | `<base_directory>/examples/discovery.md` |
+| 复合型 | `<base_directory>/examples/composite.md` |
 
 **原因**：
 1. 样例提供了该类型任务的标准 OODA 流程模板
@@ -507,14 +506,16 @@ PASS条件: [通过标准]
 
 ## 7. 参考
 
-### 样例路径
+### 样例 Skill
+
+样例通过 `adaptorv4-examples` skill 提供。加载 skill 后，样例文件位于 `examples/` 子目录：
 
 | 文件 | 内容 |
 |------|------|
-| `docs/adaptorv4-examples/execution.md` | 执行型任务样例（DEPTH 1-5）|
-| `docs/adaptorv4-examples/exploration.md` | 探索型任务样例（DEPTH 1-5）|
-| `docs/adaptorv4-examples/discovery.md` | 发现型任务样例（DEPTH 1-5）|
-| `docs/adaptorv4-examples/composite.md` | 复合型任务样例（DEPTH 2-5）|
+| `examples/execution.md` | 执行型任务样例（DEPTH 1-5）|
+| `examples/exploration.md` | 探索型任务样例（DEPTH 1-5）|
+| `examples/discovery.md` | 发现型任务样例（DEPTH 1-5）|
+| `examples/composite.md` | 复合型任务样例（DEPTH 2-5）|
 
 根据任务具体类型参考对应样例，不要一次性加载所有。
 
