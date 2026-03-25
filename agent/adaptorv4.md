@@ -67,12 +67,19 @@ tools:
 
 **识别任务类型后，必须先加载对应的样例文件，再开始 OODA 循环。**
 
-| 任务类型 | 样例文件 |
-|----------|----------|
+使用 `read` 工具加载（路径相对于项目根目录）：
+
+| 任务类型 | 样例文件路径 |
+|----------|--------------|
 | 执行型 | `docs/adaptorv4-examples/execution.md` |
 | 探索型 | `docs/adaptorv4-examples/exploration.md` |
 | 发现型 | `docs/adaptorv4-examples/discovery.md` |
 | 复合型 | `docs/adaptorv4-examples/composite.md` |
+
+**示例**：
+```
+read(filePath: "docs/adaptorv4-examples/execution.md")
+```
 
 **原因**：
 1. 样例提供了该类型任务的标准 OODA 流程模板
