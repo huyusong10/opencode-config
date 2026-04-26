@@ -1,6 +1,6 @@
-# OpenCode automatically create these files:
+# Package/runtime files:
 bun.lock
-package.json
+package-lock.json
 node_modules/
 
 # Python files:
@@ -24,6 +24,9 @@ __pycache__/
 # Planning state (generated at runtime)
 .planning/
 .ralph/
+.agentcfg/
+backups/
+dist/
 
 # Task logger output (generated at runtime)
 .log/

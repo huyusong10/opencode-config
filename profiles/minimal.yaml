@@ -1,0 +1,15 @@
+name: minimal
+targets:
+  - codex
+  - claude
+  - opencode
+assets:
+  - instructions
+  - shared-rules
+  - shared-skills
+filters:
+  shared-skills:
+    include:
+      - loopora-task-alignment
+      - skill-creator
+      - web-ui-reviewer

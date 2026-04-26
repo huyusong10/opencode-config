@@ -1,0 +1,6 @@
+name: codex-heavy
+targets:
+  - codex
+assets:
+  - instructions
+  - shared-skills

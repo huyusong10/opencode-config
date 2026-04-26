@@ -1,0 +1,37 @@
+name: opencode
+instruction:
+  destination: ~/.config/opencode/AGENTS.md
+  overlay: opencode
+placements:
+  - id: opencode-config
+    source: assets/config/opencode/opencode.jsonc
+    destination: ~/.config/opencode/opencode.jsonc
+    kind: file
+  - id: opencode-tui
+    source: assets/config/opencode/tui.json
+    destination: ~/.config/opencode/tui.json
+    kind: file
+  - id: opencode-agents
+    source: assets/agents/opencode
+    destination: ~/.config/opencode/agent
+    kind: directory
+  - id: opencode-commands
+    source: assets/commands/opencode
+    destination: ~/.config/opencode/command
+    kind: directory
+  - id: opencode-plugins
+    source: assets/plugins/opencode
+    destination: ~/.config/opencode/plugin
+    kind: directory
+  - id: shared-rules
+    source: assets/rules/shared
+    destination: ~/.config/opencode/rules
+    kind: directory
+  - id: shared-scripts
+    source: assets/scripts/shared
+    destination: ~/.config/opencode/scripts
+    kind: directory
+  - id: shared-skills
+    source: assets/skills
+    destination: ~/.config/opencode/skills
+    kind: directory

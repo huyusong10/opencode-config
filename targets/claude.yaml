@@ -1,0 +1,9 @@
+name: claude
+instruction:
+  destination: ~/.claude/CLAUDE.md
+  overlay: claude
+placements:
+  - id: shared-skills
+    source: assets/skills
+    destination: ~/.claude/skills
+    kind: directory

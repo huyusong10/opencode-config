@@ -1,0 +1,13 @@
+name: opencode-full
+targets:
+  - opencode
+assets:
+  - instructions
+  - shared-rules
+  - shared-scripts
+  - shared-skills
+  - opencode-config
+  - opencode-tui
+  - opencode-agents
+  - opencode-commands
+  - opencode-plugins
