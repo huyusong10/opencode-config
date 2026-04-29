@@ -51,13 +51,16 @@ Git 命令只管理本仓库，不直接修改 `~/.codex`、`~/.claude`、`~/.co
 
 ```text
 assets/
-    instructions/          # 共享主干与工具 overlay
     skills/                # 可共享 Agent Skills
     config/opencode/       # OpenCode JSONC/TUI 配置
     agents/opencode/       # OpenCode agents
     commands/opencode/     # OpenCode commands
     plugins/opencode/      # OpenCode plugins
     rules/shared/          # 共享规则文件
+AGENTS.md                  # Codex 当前渲染出的单体指令
+instructions/
+    shared/core.md         # 三个工具共享的核心规则源
+    <target>/main.md       # 可选：只有存在有效独占规则时才新增
 targets/
     codex.yaml             # Codex 安装适配器
     claude.yaml            # Claude Code 安装适配器
@@ -70,8 +73,12 @@ profiles/
 templates/
     instructions.md        # AGENTS.md/CLAUDE.md 渲染模板
 design/
+    README.md              # 设计契约入口、索引与预算规则
     config-system.md       # 配置系统契约
+    decisions/             # 重要设计取舍
+    regressions/           # 高价值复发型历史坑
 tests/
+    README.md              # 测试分层、断言原则与预算规则
     *.test.ts              # CLI 契约测试
 ```
 

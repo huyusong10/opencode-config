@@ -38,18 +38,24 @@
 
 ## 指令文件契约
 
-`assets/instructions/base.md` 是共享主干。各工具 overlay 位于 `assets/instructions/<target>.md`。单个 target 的 `render` 输出必须是可直接写入目标指令文件的纯内容。渲染顺序固定为：
+指令源文件在仓库内按共享内容和目标工具独占内容拆分。共享规则位于 `instructions/shared/`，目标工具独占规则可放在 `instructions/<target>/`。安装到目标工具后的 `AGENTS.md` / `CLAUDE.md` 必须是完整单体文件，不得依赖仓库源码路径。每个 target 在 `targets/<target>.yaml` 的 `instruction.fragments` 中声明拼接顺序。
 
-1. generated header
-2. shared base
-3. target overlay
+单个 target 的 `render` 输出必须是可直接写入目标指令文件的纯内容，不添加生成注释头，避免占用目标工具上下文窗口。渲染顺序固定为：
+
+1. shared core
+2. 可选的 target 专属片段
 
 生成文件不得把具体中文或英文文案当成稳定契约；测试应断言结构、标记和目标路径，而不是大段文案。
+
+不同工具共享核心规则。target 专属片段只有在存在真实、有效、不可共享的要求时才新增；安装路径、目录说明、空泛提醒这类信息不得伪装成规则占用上下文。若用户删除某个 target 的独占内容，不得通过 shared 片段绕回来。
+
+`validate` 必须检查指令片段存在、片段行数预算、渲染后文件行数预算，以及渲染结果是否引用 `assets/` 等源码路径。预算是结构约束；若超过预算，优先合并、删除、重构旧内容或下沉到对应 README，而不是继续追加。
 
 ## 安装与删除安全边界
 
 - 默认安装模式是 copy；link 只用于调试或本机联动。
 - 目标路径存在且不是当前 manifest 托管内容时，必须先备份再覆盖。
+- 目标路径是坏符号链接时，也视为需要备份和替换的已有目标，不能让写入跟随坏链接失败。
 - 目标路径存在且内容与 manifest checksum 不一致时，删除前必须备份。
 - `uninstall` 不扫描删除未知文件，只处理 manifest 中的路径。
 - `restore` 只恢复由 `agentcfg backup` 生成且带索引的备份，并只合并被恢复目标路径对应的 manifest 条目。

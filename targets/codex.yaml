@@ -1,7 +1,9 @@
 name: codex
 instruction:
   destination: ~/.codex/AGENTS.md
-  overlay: codex
+  fragments:
+    - instructions/shared/core.md
+  maxLines: 220
 placements:
   - id: shared-skills
     source: assets/skills

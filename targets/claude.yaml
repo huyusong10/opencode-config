@@ -1,7 +1,9 @@
 name: claude
 instruction:
   destination: ~/.claude/CLAUDE.md
-  overlay: claude
+  fragments:
+    - instructions/shared/core.md
+  maxLines: 220
 placements:
   - id: shared-skills
     source: assets/skills
