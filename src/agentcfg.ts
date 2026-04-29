@@ -422,7 +422,7 @@ function doctorCommand() {
     console.log(`managed entries: ${manifest.entries.length}`)
 
     const suspicious = scan(repo, { includeManagedIgnored: true })
-        .filter((file) => isSensitivePath(file))
+        .filter((file) => isSensitivePath(path.relative(repo, file)))
 
     if (suspicious.length) {
         console.log("suspicious files:")
@@ -450,7 +450,7 @@ function backupCommand(spec: string, opts: Options) {
     }
 
     for (const entry of entries) {
-        if (isManagedIgnoredPath(entry.destination)) continue
+        if (isManagedIgnoredDestination(entry.destination)) continue
         const backup = backupPath(id, entry.destination)
         copyExisting(entry.destination, backup)
         index.entries.push({ destination: entry.destination, backup })
@@ -502,7 +502,7 @@ function importCommand(spec: string, opts: Options) {
         for (const root of roots) {
             if (!existsSync(root)) continue
             for (const file of scan(root)) {
-                if (isManagedIgnoredPath(file)) continue
+                if (isManagedIgnoredPath(path.relative(root, file))) continue
                 candidates.push({ target: name, path: file, reason: "candidate-config" })
             }
         }
@@ -590,6 +590,7 @@ function assertStandaloneInstructions(target: string, content: string) {
 function saveCommand(message: string) {
     if (!message.trim()) throw new Error("save 需要提交信息")
     validateCommand(true)
+    assertNoDefaultExcludedGitPaths()
     const status = git(["status", "--porcelain"]).stdout.trim()
     if (!status) {
         console.log("没有可提交变更。")
@@ -821,15 +822,51 @@ function isTraversalIgnoredName(name: string) {
 }
 
 function isManagedIgnoredPath(file: string) {
-    return file
-        .split(path.sep)
+    return pathParts(file)
         .some((part) => isTraversalIgnoredName(part) || managedIgnoredNames.some((pattern) => pattern.test(part)))
 }
 
 function isSensitivePath(file: string) {
-    return file
-        .split(path.sep)
+    return pathParts(file)
         .some((part) => sensitiveNames.some((pattern) => pattern.test(part)))
+}
+
+function pathParts(file: string) {
+    return file.split(/[\\/]+/).filter(Boolean)
+}
+
+function isManagedIgnoredDestination(file: string) {
+    const relativeToHome = relativeInside(homedir(), path.resolve(file))
+    return isManagedIgnoredPath(relativeToHome || path.basename(file))
+}
+
+function relativeInside(root: string, file: string) {
+    const relative = path.relative(root, file)
+    if (!relative) return "."
+    if (relative.startsWith("..") || path.isAbsolute(relative)) return undefined
+    return relative
+}
+
+function assertNoDefaultExcludedGitPaths() {
+    const paths = new Set([
+        ...gitPathList(["ls-files", "-z"]),
+        ...gitPathList(["ls-files", "--others", "--modified", "--cached", "--exclude-standard", "-z"]),
+    ])
+    const blocked = [...paths]
+        .filter((file) => isManagedIgnoredPath(file))
+        .sort()
+
+    if (!blocked.length) return
+
+    const shown = blocked.slice(0, 10).join(", ")
+    const suffix = blocked.length > 10 ? ` 等 ${blocked.length} 项` : ""
+    throw new Error(`拒绝保存默认排除内容：${shown}${suffix}`)
+}
+
+function gitPathList(args: string[]) {
+    const result = git(args)
+    if (result.status !== 0) throw new Error(result.stderr.trim() || `git ${args.join(" ")} 失败`)
+    return result.stdout.split("\0").filter(Boolean)
 }
 
 function parseJsonc(text: string) {

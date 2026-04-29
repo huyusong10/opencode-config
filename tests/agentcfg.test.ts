@@ -27,6 +27,15 @@ function run(args: string[], root = mkdtempSync(path.join(tmpdir(), "agentcfg-")
     return { ...res, root }
 }
 
+function runGit(args: string[], cwd: string) {
+    const res = spawnSync("git", args, {
+        cwd,
+        encoding: "utf8",
+    })
+    assert.equal(res.status, 0, res.stderr)
+    return res
+}
+
 function repoWithWritableInstructions(root: string) {
     const tempRepo = path.join(root, "repo")
     mkdirSync(path.join(tempRepo, "assets"), { recursive: true })
@@ -177,6 +186,40 @@ test("restore brings back files and matching manifest entries", () => {
     assert.match(status.stdout, /ok\s+codex:shared-skills/)
 })
 
+test("backup filters target contents without treating home path segments as excluded", () => {
+    const parent = mkdtempSync(path.join(tmpdir(), "agentcfg-"))
+    const root = path.join(parent, "projects")
+    mkdirSync(root, { recursive: true })
+
+    const install = run(["install", "codex", "--profile", "minimal"], root)
+    assert.equal(install.status, 0, install.stderr)
+    const backup = run(["backup", "codex"], root)
+    assert.equal(backup.status, 0, backup.stderr)
+
+    const id = backup.stdout.match(/备份完成：(\S+)/)?.[1]
+    assert.ok(id)
+    const index = JSON.parse(readFileSync(path.join(root, ".agentcfg", "backups", id, "index.json"), "utf8"))
+    assert.equal(index.entries.length, 2)
+    assert.equal(index.entries.some((entry: any) => entry.destination.endsWith(path.join(".codex", "AGENTS.md"))), true)
+    assert.equal(index.entries.some((entry: any) => entry.destination.endsWith(path.join(".agents", "skills"))), true)
+})
+
+test("import plan filters target-relative ignored files only", () => {
+    const parent = mkdtempSync(path.join(tmpdir(), "agentcfg-"))
+    const root = path.join(parent, "projects")
+    const codexRoot = path.join(root, ".codex")
+    mkdirSync(codexRoot, { recursive: true })
+    writeFileSync(path.join(codexRoot, "local.md"), "local config\n")
+    writeFileSync(path.join(codexRoot, "token.txt"), "not a real token\n")
+
+    const res = run(["import", "codex", "--plan"], root)
+    assert.equal(res.status, 0, res.stderr)
+    const plan = JSON.parse(res.stdout)
+    const paths = plan.candidates.map((candidate: any) => candidate.path)
+    assert.equal(paths.some((item: string) => item.endsWith(path.join(".codex", "local.md"))), true)
+    assert.equal(paths.some((item: string) => item.endsWith(path.join(".codex", "token.txt"))), false)
+})
+
 test("link mode diff follows symlinked directory contents", () => {
     const root = mkdtempSync(path.join(tmpdir(), "agentcfg-"))
     const install = run(["install", "codex", "--profile", "minimal", "--link"], root)
@@ -203,6 +246,32 @@ test("doctor detects sensitive files even though managed scans exclude them", ()
     assert.equal(res.status, 0, res.stderr)
     assert.match(res.stdout, /suspicious files:/)
     assert.match(res.stdout, /token\.txt/)
+})
+
+test("doctor checks sensitive names relative to the repository", () => {
+    const home = mkdtempSync(path.join(tmpdir(), "agentcfg-"))
+    const parent = path.join(home, "token-work")
+    mkdirSync(parent, { recursive: true })
+    const tempRepo = repoWithWritableInstructions(parent)
+
+    const res = run(["doctor"], home, { AGENTCFG_REPO_ROOT: tempRepo })
+    assert.equal(res.status, 0, res.stderr)
+    assert.match(res.stdout, /suspicious files: none/)
+})
+
+test("save refuses to stage default excluded files", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "agentcfg-"))
+    const tempRepo = repoWithWritableInstructions(root)
+    runGit(["init"], tempRepo)
+    writeFileSync(path.join(tempRepo, "token.txt"), "not a real token\n")
+
+    const res = run(["save", "checkpoint"], root, { AGENTCFG_REPO_ROOT: tempRepo })
+    assert.notEqual(res.status, 0)
+    assert.match(res.stderr, /拒绝保存默认排除内容/)
+    assert.match(res.stderr, /token\.txt/)
+
+    const staged = runGit(["diff", "--cached", "--name-only"], tempRepo)
+    assert.equal(staged.stdout, "")
 })
 
 test("rollback without --apply is a read-only plan", () => {
