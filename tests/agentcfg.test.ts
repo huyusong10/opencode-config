@@ -59,6 +59,12 @@ test("validate checks repository contracts", () => {
     assert.match(res.stdout, /validate ok/)
 })
 
+test("rendered codex instructions stay in sync with AGENTS.md", () => {
+    const res = run(["render", "codex"])
+    assert.equal(res.status, 0, res.stderr)
+    assert.equal(res.stdout, readFileSync(path.join(repo, "AGENTS.md"), "utf8"))
+})
+
 test("validate rejects oversized instruction fragments", () => {
     const root = mkdtempSync(path.join(tmpdir(), "agentcfg-"))
     const tempRepo = repoWithWritableInstructions(root)
