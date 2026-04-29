@@ -3,7 +3,7 @@ instruction:
   destination: ~/.config/opencode/AGENTS.md
   fragments:
     - instructions/shared/core.md
-  maxLines: 220
+  maxLines: 300
 placements:
   - id: opencode-config
     source: assets/config/opencode/opencode.jsonc

@@ -114,8 +114,8 @@ const sensitiveNames = [
     /^key\.(json|txt|pem|key|env)$/i,
 ]
 const instructionLineBudgets = {
-    fragment: 220,
-    rendered: 240,
+    fragment: 300,
+    rendered: 300,
 }
 const sourceOnlyInstructionReferences = [
     /assets\//,
