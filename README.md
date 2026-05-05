@@ -73,7 +73,7 @@ profiles/
 templates/
     instructions.md        # AGENTS.md/CLAUDE.md 渲染模板
 design/
-    README.md              # 设计契约入口、索引与预算规则
+    README.md              # 设计入口、索引与预算规则
     config-system.md       # 配置系统契约
     decisions/             # 重要设计取舍
     regressions/           # 高价值复发型历史坑
