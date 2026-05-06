@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | 配置系统 CLI、安装、渲染、备份 | `design/config-system.md` | `tests/agentcfg.test.ts` |
 | 全局指令共享规则 | `instructions/shared/core.md` | `agentcfg render <target>`、`tests/agentcfg.test.ts` |
-| Codex 全局指令 | `AGENTS.md` | `agentcfg render codex`、`tests/agentcfg.test.ts` |
+| Codex 全局指令 | `AGENTS.md`、`instructions/codex/main.md` | `agentcfg render codex`、`tests/agentcfg.test.ts` |
 | 目标工具独占规则 | `instructions/<target>/main.md`，仅在确有有效独占内容时存在 | `agentcfg render <target>`、`tests/agentcfg.test.ts` |
 | 重要设计取舍 | `design/decisions/README.md` | 关联到对应设计或测试 |
 | 复发型历史坑 | `design/regressions/README.md` | 优先关联自动验证 |

@@ -40,6 +40,7 @@ function repoWithWritableInstructions(root: string) {
     const tempRepo = path.join(root, "repo")
     mkdirSync(path.join(tempRepo, "assets"), { recursive: true })
     mkdirSync(path.join(tempRepo, "instructions", "shared"), { recursive: true })
+    mkdirSync(path.join(tempRepo, "instructions", "codex"), { recursive: true })
 
     for (const dir of ["profiles", "targets", "templates"]) {
         symlinkSync(path.join(repo, dir), path.join(tempRepo, dir), "dir")
@@ -49,6 +50,7 @@ function repoWithWritableInstructions(root: string) {
     }
     copyFileSync(path.join(repo, "AGENTS.md"), path.join(tempRepo, "AGENTS.md"))
     copyFileSync(path.join(repo, "instructions", "shared", "core.md"), path.join(tempRepo, "instructions", "shared", "core.md"))
+    copyFileSync(path.join(repo, "instructions", "codex", "main.md"), path.join(tempRepo, "instructions", "codex", "main.md"))
 
     return tempRepo
 }
@@ -65,6 +67,25 @@ test("rendered codex instructions stay in sync with AGENTS.md", () => {
     assert.equal(res.stdout, readFileSync(path.join(repo, "AGENTS.md"), "utf8"))
 })
 
+test("codex-only instruction fragment renders only for codex", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "agentcfg-"))
+    const tempRepo = repoWithWritableInstructions(root)
+    const marker = "codex-only-render-marker"
+    writeFileSync(path.join(tempRepo, "instructions", "shared", "core.md"), "shared instructions\n")
+    writeFileSync(path.join(tempRepo, "instructions", "codex", "main.md"), `${marker}\n`)
+
+    const codex = run(["render", "codex"], root, { AGENTCFG_REPO_ROOT: tempRepo })
+    const claude = run(["render", "claude"], root, { AGENTCFG_REPO_ROOT: tempRepo })
+    const opencode = run(["render", "opencode"], root, { AGENTCFG_REPO_ROOT: tempRepo })
+
+    assert.equal(codex.status, 0, codex.stderr)
+    assert.equal(claude.status, 0, claude.stderr)
+    assert.equal(opencode.status, 0, opencode.stderr)
+    assert.match(codex.stdout, new RegExp(marker))
+    assert.doesNotMatch(claude.stdout, new RegExp(marker))
+    assert.doesNotMatch(opencode.stdout, new RegExp(marker))
+})
+
 test("validate rejects oversized instruction fragments", () => {
     const root = mkdtempSync(path.join(tmpdir(), "agentcfg-"))
     const tempRepo = repoWithWritableInstructions(root)
@@ -76,7 +97,7 @@ test("validate rejects oversized instruction fragments", () => {
     assert.match(res.stderr, /(codex|claude|opencode) instruction fragment 行数 301 超过预算 300/)
 })
 
-test("install writes the current instruction fragment without caring about section names", () => {
+test("install writes shared and target instruction fragments without caring about section names", () => {
     const root = mkdtempSync(path.join(tmpdir(), "agentcfg-"))
     const tempRepo = repoWithWritableInstructions(root)
     const manualInstructions = [
@@ -86,12 +107,19 @@ test("install writes the current instruction fragment without caring about secti
         "Manual edits should not require test updates.",
         "",
     ].join("\n")
+    const codexOnlyInstructions = [
+        "# Target Only",
+        "",
+        "Codex can carry a target-specific rule without leaking it to other tools.",
+        "",
+    ].join("\n")
     writeFileSync(path.join(tempRepo, "instructions", "shared", "core.md"), manualInstructions)
+    writeFileSync(path.join(tempRepo, "instructions", "codex", "main.md"), codexOnlyInstructions)
     writeFileSync(path.join(tempRepo, "AGENTS.md"), manualInstructions)
 
     const res = run(["install", "all", "--profile", "full"], root, { AGENTCFG_REPO_ROOT: tempRepo })
     assert.equal(res.status, 0, res.stderr)
-    assert.equal(readFileSync(path.join(root, ".codex", "AGENTS.md"), "utf8"), manualInstructions)
+    assert.equal(readFileSync(path.join(root, ".codex", "AGENTS.md"), "utf8"), manualInstructions.trimEnd() + "\n\n" + codexOnlyInstructions)
     assert.equal(readFileSync(path.join(root, ".claude", "CLAUDE.md"), "utf8"), manualInstructions)
     assert.equal(readFileSync(path.join(root, ".config", "opencode", "AGENTS.md"), "utf8"), manualInstructions)
 })

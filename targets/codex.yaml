@@ -3,6 +3,7 @@ instruction:
   destination: ~/.codex/AGENTS.md
   fragments:
     - instructions/shared/core.md
+    - instructions/codex/main.md
   maxLines: 300
 placements:
   - id: shared-skills
