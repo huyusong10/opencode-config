@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { spawnSync } from "node:child_process"
-import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs"
+import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import test from "node:test"
@@ -95,6 +95,30 @@ test("validate rejects oversized instruction fragments", () => {
     const res = run(["validate"], root, { AGENTCFG_REPO_ROOT: tempRepo })
     assert.notEqual(res.status, 0)
     assert.match(res.stderr, /(codex|claude|opencode) instruction fragment 行数 301 超过预算 300/)
+})
+
+test("validate rejects opencode default models without matching provider entries", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "agentcfg-"))
+    const tempRepo = repoWithWritableInstructions(root)
+    rmSync(path.join(tempRepo, "assets", "config"), { recursive: true, force: true })
+    mkdirSync(path.join(tempRepo, "assets", "config", "opencode"), { recursive: true })
+    copyFileSync(path.join(repo, "assets", "config", "opencode", "tui.json"), path.join(tempRepo, "assets", "config", "opencode", "tui.json"))
+    writeFileSync(
+        path.join(tempRepo, "assets", "config", "opencode", "opencode.jsonc"),
+        JSON.stringify(
+            {
+                provider: {},
+                model: "missing-provider/model",
+                small_model: "missing-provider/model",
+            },
+            null,
+            2,
+        ),
+    )
+
+    const res = run(["validate"], root, { AGENTCFG_REPO_ROOT: tempRepo })
+    assert.notEqual(res.status, 0)
+    assert.match(res.stderr, /opencode model 引用了未知 provider：missing-provider/)
 })
 
 test("install writes shared and target instruction fragments without caring about section names", () => {

@@ -546,11 +546,22 @@ function validateCommand(silent = false) {
         }
     }
 
-    parseJsonc(readText(path.join(repo, "assets", "config", "opencode", "opencode.jsonc")))
+    validateOpenCodeConfig(parseJsonc(readText(path.join(repo, "assets", "config", "opencode", "opencode.jsonc"))))
     validateSkills(path.join(repo, "assets", "skills"))
     validateTomlFiles(repo)
 
     if (!silent) console.log("validate ok")
+}
+
+function validateOpenCodeConfig(config: AnyRecord) {
+    for (const field of ["model", "small_model"]) {
+        const value = config[field]
+        if (typeof value !== "string" || !value.includes("/")) throw new Error(`opencode ${field} 必须是 provider/model：${value}`)
+        const [provider, model] = value.split("/", 2)
+        const providerConfig = config.provider?.[provider]
+        if (!providerConfig) throw new Error(`opencode ${field} 引用了未知 provider：${provider}`)
+        if (!providerConfig.models?.[model]) throw new Error(`opencode ${field} 引用了未知 model：${value}`)
+    }
 }
 
 function validateInstructionBudgets(targets: Target[]) {
