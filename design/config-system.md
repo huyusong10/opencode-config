@@ -34,7 +34,7 @@
 | `history` | 展示最近配置版本 |
 | `rollback <ref>` | 默认只展示回滚计划；带 `--apply` 才执行 revert |
 
-`all` 是 target 聚合别名，展开为 profile 允许的目标集合；显式 target 若不在 profile targets 中，应拒绝执行。`--dry-run` 只输出计划，不修改目标目录或 manifest。
+`all` 是 target 聚合别名，展开为 profile 允许的目标集合；显式 target 若不在 profile targets 中，应拒绝执行。`--profile <name>` 与 `--profile=<name>` 表达同一个 profile 选择。`--dry-run` 只输出计划，不修改目标目录或 manifest。
 
 ## 指令文件契约
 

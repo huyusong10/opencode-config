@@ -156,6 +156,16 @@ test("install dry-run does not write manifest or target files", () => {
     assert.equal(existsSync(path.join(res.root, ".codex", "AGENTS.md")), false)
 })
 
+test("inline profile flag selects the requested asset set", () => {
+    const res = run(["install", "opencode", "--profile=minimal", "--dry-run"])
+    assert.equal(res.status, 0, res.stderr)
+    assert.match(res.stdout, /opencode:instructions/)
+    assert.match(res.stdout, /opencode:shared-rules/)
+    assert.match(res.stdout, /opencode:shared-skills/)
+    assert.doesNotMatch(res.stdout, /opencode:opencode-config/)
+    assert.doesNotMatch(res.stdout, /opencode:opencode-plugins/)
+})
+
 test("full dry-run includes OpenCode regression assets", () => {
     const res = run(["install", "opencode", "--profile", "opencode-full", "--dry-run"])
     assert.equal(res.status, 0, res.stderr)

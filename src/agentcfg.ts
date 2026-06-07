@@ -193,6 +193,8 @@ function firstArg(args: string[]) {
 }
 
 function valueAfter(args: string[], flag: string) {
+    const inline = args.find((arg) => arg.startsWith(`${flag}=`))
+    if (inline) return inline.slice(flag.length + 1)
     const index = args.indexOf(flag)
     if (index < 0) return undefined
     return args[index + 1]
