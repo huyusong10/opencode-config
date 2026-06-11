@@ -3,7 +3,7 @@
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/huyusong10/coding-agent-config/main/install.sh | bash
-#   ./install.sh [codex|claude|opencode|all] [--profile full] [--link] [--dry-run]
+#   ./install.sh [codex|claude|opencode|all] [--profile full|--profile=full] [--link] [--dry-run]
 
 set -euo pipefail
 
@@ -20,8 +20,19 @@ while [ "$#" -gt 0 ]; do
             TARGET="$1"
             ;;
         --profile)
+            if [ "$#" -lt 2 ]; then
+                echo "Missing value for --profile" >&2
+                exit 2
+            fi
             PROFILE="$2"
             shift
+            ;;
+        --profile=*)
+            PROFILE="${1#--profile=}"
+            if [ -z "$PROFILE" ]; then
+                echo "Missing value for --profile" >&2
+                exit 2
+            fi
             ;;
         --link)
             MODE="--link"

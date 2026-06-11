@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { spawnSync } from "node:child_process"
-import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import test from "node:test"
@@ -164,6 +164,45 @@ test("inline profile flag selects the requested asset set", () => {
     assert.match(res.stdout, /opencode:shared-skills/)
     assert.doesNotMatch(res.stdout, /opencode:opencode-config/)
     assert.doesNotMatch(res.stdout, /opencode:opencode-plugins/)
+})
+
+test("bootstrap installer accepts inline profile flag", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "agentcfg-"))
+    const fakeBin = path.join(root, "fakebin")
+    const checkout = path.join(root, "checkout")
+    const argFile = path.join(root, "agentcfg-args.txt")
+    mkdirSync(fakeBin, { recursive: true })
+    mkdirSync(path.join(checkout, ".git"), { recursive: true })
+    mkdirSync(path.join(checkout, "bin"), { recursive: true })
+
+    const git = path.join(fakeBin, "git")
+    writeFileSync(git, "#!/usr/bin/env sh\nexit 0\n")
+    chmodSync(git, 0o755)
+
+    const agentcfg = path.join(checkout, "bin", "agentcfg")
+    writeFileSync(agentcfg, "#!/usr/bin/env sh\nprintf '%s\\n' \"$@\" > \"$AGENTCFG_ARG_FILE\"\n")
+    chmodSync(agentcfg, 0o755)
+
+    const res = spawnSync("bash", [path.join(repo, "install.sh"), "codex", "--profile=minimal", "--dry-run"], {
+        cwd: repo,
+        env: {
+            ...process.env,
+            AGENTCFG_REPO_DIR: checkout,
+            AGENTCFG_ARG_FILE: argFile,
+            PATH: `${fakeBin}:${process.env.PATH || ""}`,
+        },
+        encoding: "utf8",
+    })
+
+    assert.equal(res.status, 0, res.stderr)
+    assert.deepEqual(readFileSync(argFile, "utf8").trim().split("\n"), [
+        "install",
+        "codex",
+        "--profile",
+        "minimal",
+        "--copy",
+        "--dry-run",
+    ])
 })
 
 test("full dry-run includes OpenCode regression assets", () => {
