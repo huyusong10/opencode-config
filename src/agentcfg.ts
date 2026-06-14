@@ -329,7 +329,7 @@ function installCommand(spec: string, opts: Options) {
     for (const step of steps) {
         const dest = expandHome(step.destination)
         const src = path.join(repo, step.source)
-        const backup = pathExists(dest) ? backupPath(backupId, dest) : undefined
+        const backup = installBackupPath(manifest, backupId, dest)
         if (backup) copyExisting(dest, backup)
 
         if (step.generated) {
@@ -359,6 +359,13 @@ function installCommand(spec: string, opts: Options) {
     manifest.updatedAt = new Date().toISOString()
     writeManifest(manifest)
     console.log(`安装完成：${entries.length} 项，manifest=${manifestPath}`)
+}
+
+function installBackupPath(manifest: Manifest, backupId: string, dest: string) {
+    if (!pathExists(dest)) return undefined
+    const current = manifest.entries.find((entry) => entry.destination === dest)
+    if (current && checksumPath(dest) === current.checksum) return undefined
+    return backupPath(backupId, dest)
 }
 
 function uninstallCommand(spec: string, opts: Options) {

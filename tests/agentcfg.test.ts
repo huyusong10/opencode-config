@@ -236,6 +236,19 @@ test("install writes manifest and backs up pre-existing non-managed files", () =
     assert.equal(manifest.entries.some((entry: any) => entry.backup), true)
 })
 
+test("install skips backups for unchanged managed files", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "agentcfg-"))
+    const first = run(["install", "codex", "--profile", "minimal"], root)
+    assert.equal(first.status, 0, first.stderr)
+
+    const second = run(["install", "codex", "--profile", "minimal"], root)
+    assert.equal(second.status, 0, second.stderr)
+
+    const manifest = JSON.parse(readFileSync(path.join(root, ".agentcfg", "manifest.json"), "utf8"))
+    assert.equal(manifest.entries.some((entry: any) => entry.backup), false)
+    assert.equal(existsSync(path.join(root, ".agentcfg", "backups")), false)
+})
+
 test("install replaces broken instruction symlink", () => {
     const root = mkdtempSync(path.join(tmpdir(), "agentcfg-"))
     const agents = path.join(root, ".config", "opencode", "AGENTS.md")
